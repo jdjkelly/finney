@@ -1,0 +1,9 @@
+{
+  "name": "@jdjkelly/sats",
+  "version": "0.0.0",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "bun-types": "^0.3.0"
+  }
+}
