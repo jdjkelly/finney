@@ -18,12 +18,12 @@ export type getmemoryinfo = string | {
 
 export interface getrpcinfo {
   // All active commands
-  active_commands: {
+  active_commands: Array<{
     // The name of the RPC command
     method: string;
     // The running time in microseconds
     duration: number;
-  }[];
+  }>;
   // The complete file path to the debug log
   logpath: string;
 }

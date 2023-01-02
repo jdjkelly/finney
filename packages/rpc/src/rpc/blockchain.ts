@@ -1,11 +1,19 @@
-import { scriptPubKey, type getrawtransaction } from './rawtransactions.js';
+import { scriptPubKey, vin, type getrawtransaction } from './rawtransactions.js';
 
 export type getbestblockhash = string;
 
-// @todo clean up for verbosity mode 3
-export type getblock = 
-  // verbosity 0
-  string | ({ // verbosity 1 
+export enum getblockInputVerbosity {
+  ZERO = 0,
+  ONE = 1,
+  TWO = 2,
+  THREE = 3
+}
+
+export type getblock = getblockVerbosity0 | getblockVerbosity1 | getblockVerbosity2 | getblockVerbosity3;
+
+export type getblockVerbosity0 = string;
+
+export type getblockVerbosity1 = {
   // the block hash (same as provided)
   hash: string;
   // The number of confirmations, or -1 if the block is not on the main chain
@@ -44,9 +52,34 @@ export type getblock =
   previousblockhash?: string;
   // The hash of the next block (if available)
   nextblockhash?: string;
-} & ({ // verbosity 2
- tx: (getrawtransaction & {fee?: number})[] 
-}));
+};
+
+export type getblockVerbosity2 = getblockVerbosity1 & {
+  tx: Array<getrawtransaction & {
+    // The transaction fee in BTC, omitted if block undo data is not available
+    fee: number;
+  }>
+}
+
+export type getblockVerbosity3 = getblockVerbosity1 & {
+  tx: Array<getrawtransaction & {
+    // The transaction fee in BTC, omitted if block undo data is not available
+    fee: number;
+    vin: Array<vin & {
+      // (Only if undo information is available)
+      prevout?: {
+        // Coinbase or not
+        generated: boolean;
+        // The height of the prevout
+        height: number;
+        // The value in BTC
+        value: number;
+        scriptPubKey: scriptPubKey;
+
+      }
+    }>;
+  }>
+}
 
 export interface getblockchaininfo {
   // current network name (main, test, regtest)
@@ -132,8 +165,9 @@ export type getblockfrompeer = Record<string, never>;
 
 export type getblockhash = string;
 
-// @todo use a generic instead of union to indicate type of verbosity
-export type getblockheader = string | {
+export type getblockheader = string | getblockheaderVerbose;
+
+export interface getblockheaderVerbose {
   // the block hash (same as provided)
   hash: string;
   // The number of confirmations, or -1 if the block is not on the main chain
@@ -351,9 +385,14 @@ export interface mempooltx {
 }
 
 // @todo use a generic instead of union to indicate type of verbosity
-export type getmempoolancestors = string[] | {
+export type getmempoolancestors = getmempoolancestorsSimple | getmempoolancestorsVerbose;
+
+export type getmempoolancestorsSimple = string[];
+
+export interface getmempoolancestorsVerbose {
   [key: string]: mempooltx
 }
+
 
 // @todo use a generic instead of union to indicate type of verbosity
 export type getmempooldescendants = string[] | {

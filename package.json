@@ -1,9 +1,21 @@
 {
-  "name": "@jdjkelly/sats",
+  "name": "@jdjkelly/finney",
   "version": "0.0.0",
-  "module": "index.ts",
-  "type": "module",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint"
+  },
   "devDependencies": {
-    "bun-types": "^0.3.0"
-  }
+    "turbo": "latest"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {},
+  "packageManager": "npm@8.19.2"
 }
