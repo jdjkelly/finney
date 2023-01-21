@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import { Result } from './result.js';
 import {
   getbestblockhash,
   getblock,
@@ -46,12 +45,131 @@ import {
   stop,
   uptime
 } from './rpc/control.js';
-import { getblocktemplate, getblocktemplate_template_request, getmininginfo, getnetworkhashps, prioritisetransaction, submitblock, submitheader } from './rpc/mining.js';
-import { addnode, clearbanned, disconnectnode, getaddednodeinfo, getconnectioncount, getnettotals, getnetworkinfo, getnodeaddresses, getpeerinfo, listbanned, ping, setban, setnetworkactive } from './rpc/network.js';
-import { analyzepsbt, combinepsbt, combinerawtransaction, converttopsbt, createpsbt, createrawtransaction, decodepsbt, decoderawtransaction, decodescript, finalizepsbt, fundrawtransaction, fundrawtransactionInputOptions, getrawtransaction, joinpsbts, sendrawtransaction, signrawtransactionwithkey, testmempoolaccept, utxoupdatepsbt } from './rpc/rawtransactions.js';
+import {
+  getblocktemplate,
+  getblocktemplate_template_request,
+  getmininginfo,
+  getnetworkhashps,
+  prioritisetransaction,
+  submitblock,
+  submitheader
+} from './rpc/mining.js';
+import {
+  addnode,
+  clearbanned,
+  disconnectnode,
+  getaddednodeinfo,
+  getconnectioncount,
+  getnettotals,
+  getnetworkinfo,
+  getnodeaddresses,
+  getpeerinfo,
+  listbanned,
+  ping,
+  setban,
+  setnetworkactive
+} from './rpc/network.js';
+import {
+  analyzepsbt,
+  combinepsbt,
+  combinerawtransaction,
+  converttopsbt,
+  createpsbt,
+  createrawtransaction,
+  decodepsbt,
+  decoderawtransaction,
+  decodescript,
+  finalizepsbt,
+  fundrawtransaction,
+  fundrawtransactionInputOptions,
+  getrawtransaction,
+  joinpsbts,
+  sendrawtransaction,
+  signrawtransactionwithkey,
+  testmempoolaccept,
+  utxoupdatepsbt
+} from './rpc/rawtransactions.js';
 import { enumeratesigners } from './rpc/signer.js';
-import { createmultisig, deriveaddresses, estimatesmartfee, getdescriptorinfo, getindexinfo, signmessagewithprivkey, validateaddress, verifymessage } from './rpc/util.js';
-import { abandontransaction, abortrescan, addmultisigaddress, backupwallet, bumpfee, createwallet, dumpprivkey, encryptwallet, getaddressesbylabel, getaddressinfo, getbalance, getbalances, getnewaddress, getrawchangeaddress, getreceivedbyaddress, getreceivedbylabel, gettransaction, getunconfirmedbalance, getwalletinfo, importaddress, importdescriptors, importmulti, importprivkey, importprunedfunds, importpubkey, importwallet, keypoolrefill, listaddressgroupings, listdescriptors, listlabels, listlockunspent, listreceivedbyaddress, listreceivedbylabel, listsinceblock, listtransactions, listunspent, listwalletdir, listwallets, loadwallet, lockunspent, migratewallet, newkeypool, psbtbumpfee, removeprunedfunds, rescanblockchain, restorewallet, send, sendall, sendallOptionsInput, sendmany, sendOptionsInput, sendtoaddress, sethdseed, setlabel, settxfee, setwalletflag, signmessage, signrawtransactionwithwallet, simulaterawtransaction, unloadwallet, upgradewallet, walletcreatefundedpsbt, walletcreatefundedpsbtOptionsInput, walletdisplayaddress, walletlock, walletpassphrase, walletpassphrasechange, walletprocesspsbt } from './rpc/wallet.js';
+import {
+  createmultisig,
+  deriveaddresses,
+  estimatesmartfee,
+  getdescriptorinfo,
+  getindexinfo,
+  signmessagewithprivkey,
+  validateaddress,
+  verifymessage
+} from './rpc/util.js';
+import {
+  abandontransaction,
+  abortrescan,
+  addmultisigaddress,
+  backupwallet,
+  bumpfee,
+  createwallet,
+  dumpprivkey,
+  encryptwallet,
+  getaddressesbylabel,
+  getaddressinfo,
+  getbalance,
+  getbalances,
+  getnewaddress,
+  getrawchangeaddress,
+  getreceivedbyaddress,
+  getreceivedbylabel,
+  gettransaction,
+  getunconfirmedbalance,
+  getwalletinfo,
+  importaddress,
+  importdescriptors,
+  importmulti,
+  importprivkey,
+  importprunedfunds,
+  importpubkey,
+  importwallet,
+  keypoolrefill,
+  listaddressgroupings,
+  listdescriptors,
+  listlabels,
+  listlockunspent,
+  listreceivedbyaddress,
+  listreceivedbylabel,
+  listsinceblock,
+  listtransactions,
+  listunspent,
+  listwalletdir,
+  listwallets,
+  loadwallet,
+  lockunspent,
+  migratewallet,
+  newkeypool,
+  psbtbumpfee,
+  removeprunedfunds,
+  rescanblockchain,
+  restorewallet,
+  send,
+  sendall,
+  sendallOptionsInput,
+  sendmany,
+  sendOptionsInput,
+  sendtoaddress,
+  sethdseed,
+  setlabel,
+  settxfee,
+  setwalletflag,
+  signmessage,
+  signrawtransactionwithwallet,
+  simulaterawtransaction,
+  unloadwallet,
+  upgradewallet,
+  walletcreatefundedpsbt,
+  walletcreatefundedpsbtOptionsInput,
+  walletdisplayaddress,
+  walletlock,
+  walletpassphrase,
+  walletpassphrasechange,
+  walletprocesspsbt
+} from './rpc/wallet.js';
 import { getzmqnotifications } from './rpc/zmq.js';
 
 type RPCResponse<T> = RPCResponseOk<T> | RPCResponseError;
@@ -71,7 +189,7 @@ interface RPCResponseError {
   id: string;
 }
 
-export default class Sats {
+export default class BitcoinRPC {
   username: string;
   password: string;
   host: string;

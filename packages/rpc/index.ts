@@ -1,1 +1,3 @@
-export * as Sats from './src/client.js';
+import BitcoinRPC from './src/client.js';
+
+export default BitcoinRPC;
