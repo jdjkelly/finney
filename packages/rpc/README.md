@@ -22,16 +22,29 @@ const bitcoinRPC = new BitcoinRPC();
 Every procedure in Bitcoin Core 0.24.0 is implemented as an `async` function on this imported class, and every function return value is expected to be a strongly typed using a generic `Promise<RPCResponse<T>>`.
 
 ```typescript
-const block = await bitcoinRPC.getblock('000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f');
+const block = await bitcoinRPC.getblock({ getblock: '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f' });
 console.log(block.result?.hash);
 ```
 
 If the procedure failed, you can expect `error` to be present:
 
 ```typescript
-const block = await bitcoinRPC.getblock('badhash');
+const block = await bitcoinRPC.getblock({ getblock: 'badhash' });
 console.error(block.result.error);
 ```
+
+## Roadmap
+- [x] Use named arguments instead of positional ones
+- [x] Prefer function overloading over union returns
+- [x] Camel cased types
+- [x] Network support
+- [ ] Hidden generating RPCs
+- [ ] Update to 0.24.1
+- [ ] Typed error response
+- [ ] SSL support
+- [ ] Batch support
+- [ ] BigNumber support
+- [ ] Multiple wallets support
 
 ## Procedures
 - [x] getbestblockhash
@@ -179,13 +192,3 @@ console.error(block.result.error);
 - [x] walletpassphrasechange
 - [x] walletprocesspsbt
 - [x] getzmqnotifications
-
-## Todos
-- [ ] Use named arguments instead of positional ones
-- [ ] BigNumber support
-- [ ] Network support
-- [ ] Batch support
-- [ ] Multiple wallets support
-- [ ] Update to 0.24.1
-- [ ] Hidden generating RPCs
-- [ ] SSL support

@@ -1,4 +1,4 @@
-export interface enumeratesigners {
+export interface EnumerateSigners {
   signers: [
     {
       // Master key fingerprint

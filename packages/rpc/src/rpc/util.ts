@@ -1,4 +1,4 @@
-export interface createmultisig {
+export interface CreateMultisig {
   // The value of the new multisig address.
   address: string;
   // The string value of the hex-encoded redemption script.
@@ -9,9 +9,9 @@ export interface createmultisig {
   warnings?: string[];
 }
 
-export type deriveaddresses = string[];
+export type DeriveAddresses = string[];
 
-export interface estimatesmartfee {
+export interface EstimateSmartFee {
   // estimate fee rate in BTC/kvB (only present if no errors were encountered)
   feerate?: number;
   // Errors encountered during processing (if there are any)
@@ -20,7 +20,7 @@ export interface estimatesmartfee {
   blocks: number;
 }
 
-export interface getdescriptorinfo {
+export interface GetDescriptorInfo {
   // The descriptor in canonical form, without private keys
   descriptor: string;
   // The checksum for the input descriptor
@@ -33,7 +33,7 @@ export interface getdescriptorinfo {
   hasprivatekeys: boolean;
 }
 
-export interface getindexinfo {
+export interface GetIndexInfo {
   [key: string]: {
     // Whether the index is synced or not
     synced: boolean;
@@ -42,9 +42,9 @@ export interface getindexinfo {
   }
 }
 
-export type signmessagewithprivkey = string;
+export type SignMessageWithPrivkey = string;
 
-export interface validateaddress {
+export interface ValidateAddress {
   // If the address is valid or not
   isvalid: boolean;
   // The bitcoin address validated
@@ -65,4 +65,4 @@ export interface validateaddress {
   error_locations?: number[];
 }
 
-export type verifymessage = boolean;
+export type VerifyMessage = boolean;

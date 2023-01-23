@@ -3,6 +3,20 @@ import { expect, it, describe } from 'bun:test';
 
 const bitcoinRPC = new BitcoinRPC();
 
+describe('getmemoryinfo', () => {
+  it('returns memory info', async () => {
+    const memoryInfo = await bitcoinRPC.getmemoryinfo();
+    expect(memoryInfo.result).not.toBeUndefined();
+    expect(typeof(memoryInfo.result) === 'object').toBe(true);
+  });
+
+  it('returns object when asking for stats', async () => {
+    const memoryInfo = await bitcoinRPC.getmemoryinfo({ mode: 'stats' });
+    expect(memoryInfo.result).not.toBeUndefined();
+    expect(typeof(memoryInfo.result) === 'object').toBe(true);
+  });
+});
+
 describe('uptime', () => {
   it('returns an uptime', async () => {
     const uptime = await bitcoinRPC.uptime();
@@ -17,7 +31,7 @@ describe('help', () => {
   });
 
   it('returns a help message for an individual command', async () => {
-    const help = await bitcoinRPC.help('help');
-    expect(help.result.slice(0, 18)).toBe('help ( "command" )');
+    const help = await bitcoinRPC.help({ command: 'help' });
+    expect(help.result?.slice(0, 18)).toBe('help ( "command" )');
   });
 });

@@ -1,10 +1,10 @@
-export type addnode = null;
+export type AddNode = null;
 
-export type clearbanned = null;
+export type ClearBanned = null;
 
-export type disconnectnode = null;
+export type DisconnectNode = null;
 
-export type getaddednodeinfo = [{
+export type GetAddedNodeInfo = {
   // The node IP address or name (as provided to addnode)
   addednode: string;
   // If connected
@@ -16,11 +16,11 @@ export type getaddednodeinfo = [{
     // connection, inbound or outbound
     connected: 'inbound' | 'outbound';
   }]
-}];
+}[];
 
-export type getconnectioncount = number;
+export type GetConnectionCount = number;
 
-export interface getnettotals {
+export interface GetNetTotals {
   // Total bytes received
   totalbytesrecv: number;
   // Total bytes sent
@@ -43,7 +43,7 @@ export interface getnettotals {
   }
 }
 
-export interface getnetworkinfo {
+export interface GetNetworkInfo {
   // the server version
   version: number;
   // the server subversion string
@@ -67,7 +67,7 @@ export interface getnetworkinfo {
   // whether p2p networking is enabled
   networkactive: boolean;
   // information per network
-  networks: [{
+  networks: Array<{
     // network (ipv4, ipv6, onion, i2p, cjdns)
     name: 'ipv4' | 'ipv6' | 'onion' | 'i2p' | 'cjdns';
     // is the network limited using -onlynet?
@@ -78,25 +78,25 @@ export interface getnetworkinfo {
     proxy: string;
     // Whether randomized credentials are used
     proxy_randomize_credentials: boolean;
-  }];
+  }>;
   // minimum relay fee rate for transactions in BTC/kvB
   relayfee: number;
   // minimum fee rate increment for mempool limiting or replacement in BTC/kvB
   incrementalfee: number;
   // list of local addresses
-  localaddresses: [{
+  localaddresses: Array<{
     // network address
     address: string;
     // network port
     port: number;
     // relative score
     score: number;
-  }];
+  }>;
   // any network and blockchain warnings
   warnings: string;
 }
 
-export type getnodeaddresses = [{
+export type GetNodeAddresses = Array<{
   // The UNIX epoch time when the node was last seen
   time: number;
   // The services offered by the node
@@ -107,9 +107,9 @@ export type getnodeaddresses = [{
   port: number;
   // The network (ipv4, ipv6, onion, i2p, cjdns) the node connected through
   network: 'ipv4' | 'ipv6' | 'onion' | 'i2p' | 'cjdns';
-}]
+}>
 
-export type getpeerinfo = [{
+export type GetPeerInfo = {
   // Peer index
   id: number;
   // (host:port) The IP address and port of the peer
@@ -190,9 +190,9 @@ export type getpeerinfo = [{
   }
   // Type of connection
   connection_type: 'outbound-full-relay' | 'block-relay-only' | 'inbound' | 'manual' | 'feeler' | 'addr-fetch';
-}]
+}[]
 
-export type listbanned = [{
+export type ListBanned = Array<{
   // The IP/Subnet of the banned node
   address: string;
   // The UNIX epoch time the ban was created
@@ -203,10 +203,10 @@ export type listbanned = [{
   ban_duration: number;
   // The time remaining until the ban expires, in seconds
   time_remaining: number;
-}]
+}>
 
-export type ping = null;
+export type Ping = null;
 
-export type setban = null;
+export type SetBan = null;
 
-export type setnetworkactive = boolean;
+export type SetNetworkActive = boolean;

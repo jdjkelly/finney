@@ -1,19 +1,10 @@
-import { scriptPubKey, vin, type getrawtransaction } from './rawtransactions.js';
+import { ScriptPubKey, Vin, type GetRawTransaction } from './rawtransactions.js';
 
-export type getbestblockhash = string;
+export type GetGestBlockhash = string;
 
-export enum getblockInputVerbosity {
-  ZERO = 0,
-  ONE = 1,
-  TWO = 2,
-  THREE = 3
-}
+export type GetBlock = string;
 
-export type getblock = getblockVerbosity0 | getblockVerbosity1 | getblockVerbosity2 | getblockVerbosity3;
-
-export type getblockVerbosity0 = string;
-
-export type getblockVerbosity1 = {
+export type GetBlockVerbosity1 = {
   // the block hash (same as provided)
   hash: string;
   // The number of confirmations, or -1 if the block is not on the main chain
@@ -54,18 +45,18 @@ export type getblockVerbosity1 = {
   nextblockhash?: string;
 };
 
-export type getblockVerbosity2 = getblockVerbosity1 & {
-  tx: Array<getrawtransaction & {
+export type GetBlockVerbosity2 = GetBlockVerbosity1 & {
+  tx: Array<GetRawTransaction & {
     // The transaction fee in BTC, omitted if block undo data is not available
     fee: number;
   }>
 }
 
-export type getblockVerbosity3 = getblockVerbosity1 & {
-  tx: Array<getrawtransaction & {
+export type GetBlockVerbosity3 = GetBlockVerbosity1 & {
+  tx: Array<GetRawTransaction & {
     // The transaction fee in BTC, omitted if block undo data is not available
     fee: number;
-    vin: Array<vin & {
+    vin: Array<Vin & {
       // (Only if undo information is available)
       prevout?: {
         // Coinbase or not
@@ -74,14 +65,14 @@ export type getblockVerbosity3 = getblockVerbosity1 & {
         height: number;
         // The value in BTC
         value: number;
-        scriptPubKey: scriptPubKey;
+        scriptPubKey: ScriptPubKey;
 
       }
     }>;
   }>
 }
 
-export interface getblockchaininfo {
+export interface GetBlockchainInfo {
   // current network name (main, test, regtest)
   chain: string;
   // the height of the most-work fully-validated chain. The genesis block has height 0
@@ -152,22 +143,22 @@ export interface getblockchaininfo {
   warnings: string;
 }
 
-export type getblockcount = number;
+export type GetBlockCount = number;
 
-export interface getblockfilter {
+export interface GetBlockFilter {
   // the hex-encoded filter data
   filter: string;
   // the hex-encoded filter header
   header: string;
 }
 
-export type getblockfrompeer = Record<string, never>;
+export type GetBlockFromPeer = Record<string, never>;
 
-export type getblockhash = string;
+export type GetBlockHash = string;
 
-export type getblockheader = string | getblockheaderVerbose;
+export type GetBlockHeader = string;
 
-export interface getblockheaderVerbose {
+export interface GetBlockHeaderVerbose {
   // the block hash (same as provided)
   hash: string;
   // The number of confirmations, or -1 if the block is not on the main chain
@@ -200,7 +191,7 @@ export interface getblockheaderVerbose {
   nextblockhash: string;
 }
 
-export interface getblockstats {
+export interface GetBlockStats {
   // Average fee in the block
   avgfee?: number;
   // Average feerate (in satoshis per virtual byte)
@@ -261,7 +252,7 @@ export interface getblockstats {
   utxo_size_inc?: number;
 }
 
-export type getchaintips = [
+export type GetChainTips = [
   {
     // height of the chain tip
     height: number;
@@ -274,7 +265,7 @@ export type getchaintips = [
   }
 ]
 
-export interface getchaintxstats {
+export interface GetChainTxStats {
   // The timestamp for the final block in the window, expressed in UNIX epoch time
   time: number;
   // The total number of transactions in the chain up to that point
@@ -293,7 +284,7 @@ export interface getchaintxstats {
   tx_rate?: number;
 }
 
-export interface getdeploymentinfo {
+export interface GetDeploymentInfo {
   // requested block hash (or tip)
   hash: string;
   // requested block height (or tip)
@@ -343,9 +334,9 @@ export interface getdeploymentinfo {
   }
 }
 
-export type getdifficulty = number;
+export type GetDifficulty = number;
 
-export interface mempooltx {
+export interface MempoolTx {
   // virtual transaction size as defined in BIP 141. This is different from actual serialized size for witness transactions as witness data is discounted.
   vsize: number;
   // transaction weight as defined in BIP 141.
@@ -384,24 +375,21 @@ export interface mempooltx {
   unbroadcast: boolean;
 }
 
-// @todo use a generic instead of union to indicate type of verbosity
-export type getmempoolancestors = getmempoolancestorsSimple | getmempoolancestorsVerbose;
+export type GetMempoolAncestors = string[];
 
-export type getmempoolancestorsSimple = string[];
-
-export interface getmempoolancestorsVerbose {
-  [key: string]: mempooltx
+export interface GetMempoolAncestorsVerbose {
+  [key: string]: MempoolTx
 }
 
+export type GetMempoolDescendants = string[];
 
-// @todo use a generic instead of union to indicate type of verbosity
-export type getmempooldescendants = string[] | {
-  [key: string]: mempooltx
+export type GetMempoolDescendantsVerbose = {
+  [key: string]: MempoolTx
 }
 
-export type getmempoolentry = mempooltx;
+export type GetMempoolEntry = MempoolTx;
 
-export interface getmempoolinfo {
+export interface GetMempoolInfo {
   // True if the mempool is fully loaded
   loaded: boolean;
   // Current tx count
@@ -426,29 +414,33 @@ export interface getmempoolinfo {
   fullrbf: boolean;
 }
 
-export type getrawmempool = string[] | {
-  [key: string]: mempooltx;
-} | { 
+export type GetRawMempool = string[];
+
+export type GetRawMempoolVerbose = {
+  [key: string]: MempoolTx;
+}
+
+export type GetRawmempoolSequence = { 
   txids: string[],
   // The mempool sequence value
   mempool_sequence: number;
 }
 
-export type gettxout = null | {
+export type GetTxout = null | {
   // The hash of the block at the tip of the chain
   bestblock: string;
   // The number of confirmations
   confirmations: number;
   // The transaction value in BTC
   value: number;
-  scriptPubKey: scriptPubKey;
+  scriptPubKey: ScriptPubKey;
   // Coinbase or not
   coinbase: boolean;
 }
 
-export type gettxoutproof = string;
+export type GetTxoutProof = string;
 
-export interface gettxoutsetinfo {
+export interface GetTxoutSetInfo {
   // The block height (index) of the returned statistics
   height: number;
   // The hash of the block at which these statistics are calculated
@@ -493,26 +485,26 @@ export interface gettxoutsetinfo {
   }
 }
 
-export type gettxspendingprevout = [{
+export type GetTxSpendingPrevout = Array<{
   // the transaction id of the checked output
   txid: string;
   // the vout value of the checked output
   vout: number;
   // the transaction id of the mempool transaction spending this output (omitted if unspent)
   spendingtxid?: string;
-}];
+}>;
 
-export type preciousblock = null;
+export type PreciousBlock = null;
 
-export type pruneblockchain = number;
+export type PruneBlockchain = number;
 
-export interface savemempool {
+export interface SaveMempool {
   // the directory and file where the mempool was saved
   filename: string;  
 }
 
 // @todo make this generic across status
-export type scantxoutset = {
+export type ScanTxoutSetStart = {
   // Whether the scan was completed
   success: boolean;
   // The number of unspent transaction outputs scanned
@@ -539,11 +531,15 @@ export type scantxoutset = {
   ]
   // The total amount of all found unspent outputs in BTC
   total_amount: number;
-} | boolean | {
+}
+
+export type ScanTxoutSetAbort = boolean;
+
+export interface ScanTxoutSetStatus {
   // Approximate percent complete
   progress: number;
 }
 
-export type verifychain = boolean;
+export type VerifyChain = boolean;
 
-export type verifytxoutproof = string[];
+export type VerifyTxoutProof = string[];

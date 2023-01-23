@@ -1,4 +1,4 @@
-export type getmemoryinfo = string | {
+export interface GetMemoryInfoStats {
   // Information about locked memory manager
   locked: {
     // Number of bytes used
@@ -16,7 +16,9 @@ export type getmemoryinfo = string | {
   }
 }
 
-export interface getrpcinfo {
+export type GetMemoryInfoMallocInfo = string;
+
+export interface GetRpcInfo {
   // All active commands
   active_commands: Array<{
     // The name of the RPC command
@@ -28,14 +30,14 @@ export interface getrpcinfo {
   logpath: string;
 }
 
-export type help = string;
+export type Help = string;
 
-export type loggingcategory = 'addrman' | 'bench' | 'blockstorage' | 'cmpctblock' | 'coindb' | 'estimatefee' | 'http' | 'i2p' | 'ipc' | 'leveldb' | 'libevent' | 'mempool' | 'mempoolrej' | 'net' | 'proxy' | 'prune' | 'qt' | 'rand' | 'reindex' | 'rpc' | 'selectcoins' | 'tor' | 'util' | 'validation' | 'walletdb' | 'zmq';
+export type LoggingCategory = 'addrman' | 'bench' | 'blockstorage' | 'cmpctblock' | 'coindb' | 'estimatefee' | 'http' | 'i2p' | 'ipc' | 'leveldb' | 'libevent' | 'mempool' | 'mempoolrej' | 'net' | 'proxy' | 'prune' | 'qt' | 'rand' | 'reindex' | 'rpc' | 'selectcoins' | 'tor' | 'util' | 'validation' | 'walletdb' | 'zmq';
 
-export interface logging {
+export interface Logging {
   [key: string]: boolean;
 }
 
-export type stop = string;
+export type Stop = string;
 
-export type uptime = number;
+export type Uptime = number;

@@ -16,9 +16,10 @@
     }
   },
   "scripts": {
-    "build": "tsc ./index.ts --outDir ./dist --declaration"
+    "build": "rm -rf /dist; tsc ./index.ts --outDir ./dist --declaration",
+    "test": "bun wiptest"
   },
   "devDependencies": {
-    "bun-types": "^0.3.0"
+    "bun-types": "^0.5.0"
   }
 }

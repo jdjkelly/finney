@@ -8,7 +8,7 @@ export interface getblocktemplate_template_request {
 }
 
 // @todo support generic here
-export type getblocktemplate = null | string | {
+export type GetBlockTemplate = null | string | {
   // The preferred block version
   version: number;
   // specific block rules that are to be enforced
@@ -75,7 +75,7 @@ export type getblocktemplate = null | string | {
   default_witness_commitment?: string;
 }
 
-export interface getmininginfo {
+export interface GetMiningInfo {
   // The current block
   blocks: number;
   // The block weight of the last assembled block (only present if a block was ever assembled)
@@ -94,10 +94,10 @@ export interface getmininginfo {
   warnings: string;
 }
 
-export type getnetworkhashps = number;
+export type GetNetworkHashps = number;
 
-export type prioritisetransaction = boolean;
+export type PrioritiseTransaction = boolean;
 
-export type submitblock = null | string;
+export type SubmitBlock = null | string;
 
-export type submitheader = null;
+export type SubmitHeader = null;

@@ -1,4 +1,4 @@
-export interface scriptPubKey {
+export interface ScriptPubKey {
   // Disassembly of the public key script
   asm: string;
   // Inferred descriptor for the output
@@ -11,15 +11,15 @@ export interface scriptPubKey {
   addresses?: string;
 }
 
-export interface vout {
+export interface Vout {
   // The value in BTC
   value: number;
   // index
   n: number;
-  scriptPubKey: scriptPubKey;
+  scriptPubKey: ScriptPubKey;
 }
 
-export interface vin {
+export interface Vin {
   // The coinbase value (only if coinbase transaction)
   coinbase?: string;
   // The transaction id (if not coinbase transaction)
@@ -39,7 +39,7 @@ export interface vin {
   sequence: number;
 }
 
-export type getrawtransaction = string | {
+export interface GetRawTransaction {
   // Whether specified block is in the active chain or not (only present with explicit "blockhash" argument)
   in_active_chain?: boolean;
   // the block hash
@@ -66,11 +66,13 @@ export type getrawtransaction = string | {
   version: number;
   // The lock time
   locktime: number;
-  vin: vin[];
-  vout: vout[]
+  vin: Vin[];
+  vout: Vout[]
 }
 
-export interface decoderawtransaction {
+export type GetRawTransactionHexEncoded = string;
+
+export interface DecodeRawTransaction {
   // The transaction id
   txid: string;
   // The transaction hash (differs from txid for witness transactions)
@@ -85,11 +87,11 @@ export interface decoderawtransaction {
   version: number;
   // The lock time
   locktime: number;
-  vin: vin[];
-  vout: vout[];
+  vin: Vin[];
+  vout: Vout[];
 }
 
-export interface analyzepsbt {
+export interface AnalyzePsbt {
   inputs?: Array<{
     // Whether a UTXO is provided
     has_utxo: boolean;
@@ -121,19 +123,19 @@ export interface analyzepsbt {
   error?: string;
 }
 
-export type combinepsbt = string;
+export type CombinePsbt = string;
 
-export type combinerawtransaction = string;
+export type CombineRawTransaction = string;
 
-export type converttopsbt = string;
+export type ConvertToPsbt = string;
 
-export type createpsbt = string;
+export type CreatePsbt = string;
 
-export type createrawtransaction = string;
+export type CreateRawTransaction = string;
 
-export interface decodepsbt {
+export interface DecodePsbt {
   // The decoded network-serialized unsigned transaction.
-  tx: decoderawtransaction;
+  tx: DecodeRawTransaction;
   global_xpubs: Array<{
     // The extended public key this path corresponds to
     xpub: string;
@@ -162,7 +164,7 @@ export interface decodepsbt {
   }>;
   inputs: Array<{
     // Decoded network transaction for non-witness UTXOs
-    non_witness_utxo?: decoderawtransaction;
+    non_witness_utxo?: DecodeRawTransaction;
     // Transaction output for witness UTXOs
     witness_utxo?: {
       // The value in BTC
@@ -346,7 +348,7 @@ export interface decodepsbt {
   fee?: number;
 }
 
-export interface decoderawtransaction {
+export interface DecodeRawTransaction {
   // The transaction id
   txid: string;
   // The transaction hash (differs from txid for witness transactions)
@@ -361,11 +363,11 @@ export interface decoderawtransaction {
   version: number;
   // The lock time
   locktime: number;
-  vin: vin[];
-  vout: vout[]; 
+  vin: Vin[];
+  vout: Vout[]; 
 }
 
-export interface decodescript {
+export interface DecodeScript {
   // Script public key
   asm: string;
   // Inferred descriptor for the script
@@ -393,7 +395,7 @@ export interface decodescript {
   }
 }
 
-export interface finalizepsbt {
+export interface FinalizePsbt {
   // The base64-encoded partially signed transaction if not extracted
   psbt?: string;
   // The hex-encoded network transaction if extracted
@@ -402,7 +404,7 @@ export interface finalizepsbt {
   complete: boolean;
 }
 
-export interface fundrawtransactionInputOptions {
+export interface FundrawtransactionInputOptions {
   // For a transaction with existing inputs, automatically include more if they are not enough.
   add_inputs?: boolean;
   // Include inputs that are not safe to spend (unconfirmed transactions from outside keys and unconfirmed replacement transactions).
@@ -461,7 +463,7 @@ export interface fundrawtransactionInputOptions {
   }
 }
 
-export interface fundrawtransaction {
+export interface FundRawTransaction {
   // The resulting raw transaction (hex-encoded string)
   hex: string;
   // Fee in BTC the resulting transaction pays
@@ -470,11 +472,11 @@ export interface fundrawtransaction {
   changepos: number;
 }
 
-export type joinpsbts = string;
+export type JoinPsbts = string;
 
-export type sendrawtransaction = string;
+export type SendRawTransaction = string;
 
-export interface signrawtransactionwithkey { 
+export interface SignRawTransactionWithKey { 
   // The hex-encoded raw transaction with signature(s)
   hex: string;
   // If the transaction has a complete set of signatures
@@ -495,7 +497,7 @@ export interface signrawtransactionwithkey {
   }>
 }
 
-export type testmempoolaccept = Array<{
+export type TestMempoolAccept = Array<{
   // The transaction hash in hex
   txid: string;
   // The transaction witness hash in hex
@@ -515,4 +517,4 @@ export type testmempoolaccept = Array<{
   'reject-reason'?: string;
 }>;
 
-export type utxoupdatepsbt = string;
+export type UtxoUpdatePsbt = string;
