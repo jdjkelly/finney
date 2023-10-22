@@ -5,17 +5,5 @@
   "workspaces": [
     "packages/*"
   ],
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev --parallel",
-    "lint": "turbo run lint"
-  },
-  "devDependencies": {
-    "turbo": "latest"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "dependencies": {},
-  "packageManager": "npm@8.19.2"
+  "dependencies": {}
 }

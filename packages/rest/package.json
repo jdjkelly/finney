@@ -1,8 +1,0 @@
-{
-  "name": "@finney/rest",
-  "module": "index.ts",
-  "type": "module",
-  "devDependencies": {
-    "bun-types": "^0.3.0"
-  }
-}

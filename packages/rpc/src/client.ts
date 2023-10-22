@@ -232,7 +232,6 @@ export default class BitcoinRPC {
 
     return await request.json() as RPCResponse<T>;
   }
-
   // Blockchain RPC
 
   /*
