@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from "crypto";
 import {
   GetBlock,
   GetBlockchainInfo,
@@ -38,7 +38,9 @@ import {
   ScanTxoutSetStatus,
   VerifyChain,
   VerifyTxoutProof,
-} from './rpc/blockchain.js';
+} from "./rpc/blockchain.js";
+export * from "./rpc/blockchain.js";
+
 import {
   GetMemoryInfoMallocInfo,
   GetMemoryInfoStats,
@@ -48,7 +50,7 @@ import {
   LoggingCategory,
   Stop,
   Uptime,
-} from './rpc/control.js';
+} from "./rpc/control.js";
 import {
   GetBlockTemplate,
   getblocktemplate_template_request,
@@ -57,7 +59,7 @@ import {
   PrioritiseTransaction,
   SubmitBlock,
   SubmitHeader,
-} from './rpc/mining.js';
+} from "./rpc/mining.js";
 import {
   AddNode,
   ClearBanned,
@@ -72,7 +74,7 @@ import {
   Ping,
   SetBan,
   SetNetworkActive,
-} from './rpc/network.js';
+} from "./rpc/network.js";
 import {
   AnalyzePsbt,
   CombinePsbt,
@@ -93,8 +95,8 @@ import {
   SignRawTransactionWithKey,
   TestMempoolAccept,
   UtxoUpdatePsbt,
-} from './rpc/rawtransactions.js';
-import { EnumerateSigners } from './rpc/signer.js';
+} from "./rpc/rawtransactions.js";
+import { EnumerateSigners } from "./rpc/signer.js";
 import {
   CreateMultisig,
   DeriveAddresses,
@@ -104,7 +106,7 @@ import {
   SignMessageWithPrivkey,
   ValidateAddress,
   VerifyMessage,
-} from './rpc/util.js';
+} from "./rpc/util.js";
 import {
   AbandonTransaction,
   AbortRescan,
@@ -177,8 +179,8 @@ import {
   WalletPassphrase,
   WalletPassphraseChange,
   WalletProcessPsbt,
-} from './rpc/wallet.js';
-import { GetZmqNotifications } from './rpc/zmq.js';
+} from "./rpc/wallet.js";
+import { GetZmqNotifications } from "./rpc/zmq.js";
 
 type RPCResponse<T> = RPCResponseOk<T> | RPCResponseError;
 
@@ -202,35 +204,68 @@ export default class BitcoinRPC {
   password: string;
   host: string;
   port: number;
+  authenticated: boolean;
+  protocol: "http" | "https" = "http";
 
-  constructor(
-    { username = process.env.RPC_USERNAME, password = process.env.RPC_PASSWORD, host = process.env.RPC_HOST, port = 8332 }:
-      { username?: string, password?: string, host?: string, port?: number } = {}
-  ) {
-    if (!username) throw new Error('username is required');
-    if (!password) throw new Error('password is required');
+  constructor({
+    username = process.env.RPC_USERNAME,
+    password = process.env.RPC_PASSWORD,
+    host = process.env.RPC_HOST,
+    port = 8332,
+    authenticated = true,
+    protocol,
+  }: {
+    username?: string;
+    password?: string;
+    host?: string;
+    port?: number;
+    authenticated?: boolean;
+    protocol?: "http" | "https";
+  } = {}) {
+    if (authenticated) {
+      if (!username) throw new Error("username is required");
+      if (!password) throw new Error("password is required");
+    }
 
+    this.authenticated = authenticated;
+    // @todo fix with overload
+    //@ts-ignore
     this.username = username;
+    //@ts-ignore
     this.password = password;
-    this.host = host ?? '127.0.0.1';
+    this.host = host ?? "127.0.0.1";
     this.port = port;
+
+    if (protocol) {
+      this.protocol = protocol;
+    }
   }
 
-  async request<T>(method: string, params: Record<string, unknown> = {}): Promise<RPCResponse<T>> {
-    const request = await fetch(`http://${this.host}:${this.port}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${btoa(`${this.username}:${this.password}`)}`,
-      },
+  async request<T>(
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<RPCResponse<T>> {
+    const response = await fetch(`${this.protocol}://${this.host}`, {
+      method: "POST",
+      ...(this.authenticated && {
+        headers: {
+          Authorization: `Basic ${btoa(`${this.username}:${this.password}`)}`,
+        },
+      }),
       body: JSON.stringify({
-        jsonrpc: '1.0',
+        jsonrpc: "1.0",
         id: randomUUID(),
         method,
-        params
-      })
-    })
+        params,
+      }),
+    });
 
-    return await request.json() as RPCResponse<T>;
+    // @todo test this -- what happens on 404?
+    if (response.ok) {
+      return (await response.json()) as RPCResponse<T>;
+    } else {
+      throw new Error(response.statusText);
+    }
   }
   // Blockchain RPC
 
@@ -240,7 +275,7 @@ export default class BitcoinRPC {
   Returns the hash of the best (tip) block in the most-work fully-validated chain.
   */
   public async getbestblockhash() {
-    return await this.request<GetGestBlockhash>('getbestblockhash');
+    return await this.request<GetGestBlockhash>("getbestblockhash");
   }
 
   /*
@@ -255,12 +290,29 @@ export default class BitcoinRPC {
   1. blockhash    (string, required) The block hash
   2. verbosity    (numeric, optional, default=1) 0 for hex-encoded data, 1 for a JSON object, 2 for JSON object with transaction data, and 3 for JSON object with transaction data including prevout information for inputs
   */
-  public async getblock(options: { blockhash: string, verbosity: 0 }): Promise<RPCResponse<GetBlock>>;
-  public async getblock(options: { blockhash: string, verbosity?: 1 }): Promise<RPCResponse<GetBlockVerbosity1>>;
-  public async getblock(options: { blockhash: string, verbosity: 2 }): Promise<RPCResponse<GetBlockVerbosity2>>;
-  public async getblock(options: { blockhash: string, verbosity: 3 }): Promise<RPCResponse<GetBlockVerbosity3>>;
-  public async getblock(options: { blockhash: string, verbosity?: 0 | 1 | 2 | 3 }) {
-    return await this.request<GetBlock | GetBlockVerbosity1 | GetBlockVerbosity2 | GetBlockVerbosity3>('getblock', options);
+  public async getblock(options: {
+    blockhash: string;
+    verbosity: 0;
+  }): Promise<RPCResponse<GetBlock>>;
+  public async getblock(options: {
+    blockhash: string;
+    verbosity?: 1;
+  }): Promise<RPCResponse<GetBlockVerbosity1>>;
+  public async getblock(options: {
+    blockhash: string;
+    verbosity: 2;
+  }): Promise<RPCResponse<GetBlockVerbosity2>>;
+  public async getblock(options: {
+    blockhash: string;
+    verbosity: 3;
+  }): Promise<RPCResponse<GetBlockVerbosity3>>;
+  public async getblock(options: {
+    blockhash: string;
+    verbosity?: 0 | 1 | 2 | 3;
+  }) {
+    return await this.request<
+      GetBlock | GetBlockVerbosity1 | GetBlockVerbosity2 | GetBlockVerbosity3
+    >("getblock", options);
   }
 
   /*
@@ -269,7 +321,7 @@ export default class BitcoinRPC {
   Returns an object containing various state info regarding blockchain processing.
   */
   public async getblockchaininfo() {
-    return await this.request<GetBlockchainInfo>('getblockchaininfo');
+    return await this.request<GetBlockchainInfo>("getblockchaininfo");
   }
 
   /*
@@ -279,7 +331,7 @@ export default class BitcoinRPC {
   The genesis block has height 0.
   */
   public async getblockcount() {
-    return await this.request<GetBlockCount>('getblockcount');
+    return await this.request<GetBlockCount>("getblockcount");
   }
 
   /*
@@ -291,8 +343,11 @@ export default class BitcoinRPC {
   1. blockhash     (string, required) The hash of the block
   2. filtertype    (string, optional, default="basic") The type name of the filter
   */
-  public async getblockfilter(options: { blockhash: string, filtertype: string }) {
-    return await this.request<GetBlockFilter>('getblockfilter', options);
+  public async getblockfilter(options: {
+    blockhash: string;
+    filtertype: string;
+  }) {
+    return await this.request<GetBlockFilter>("getblockfilter", options);
   }
 
   /*
@@ -305,8 +360,11 @@ export default class BitcoinRPC {
 
   Returns an empty JSON object if the request was successfully scheduled.
   */
-  public async getblockfrompeer(options: { blockhash: string, peer_id: string }) {
-    return await this.request<GetBlockFromPeer>('getblockfrompeer', options);
+  public async getblockfrompeer(options: {
+    blockhash: string;
+    peer_id: string;
+  }) {
+    return await this.request<GetBlockFromPeer>("getblockfrompeer", options);
   }
 
   /*
@@ -318,7 +376,7 @@ export default class BitcoinRPC {
   1. height    (numeric, required) The height index
   */
   public async getblockhash(options: { height: number }) {
-    return await this.request<GetBlockHash>('getblockhash', options);
+    return await this.request<GetBlockHash>("getblockhash", options);
   }
 
   /*
@@ -331,10 +389,22 @@ export default class BitcoinRPC {
   1. blockhash    (string, required) The block hash
   2. verbose      (boolean, optional, default=true) true for a json object, false for the hex-encoded data
   */
-  public async getblockheader(options: { blockhash: string, verbose?: true }): Promise<RPCResponse<GetBlockHeaderVerbose>>;
-  public async getblockheader(options: { blockhash: string, verbose: false }): Promise<RPCResponse<GetBlockHeader>>;
-  public async getblockheader(options: { blockhash: string, verbose?: boolean }) {
-    return await this.request<GetBlockHeader | GetBlockHeaderVerbose>('getblockheader', options);
+  public async getblockheader(options: {
+    blockhash: string;
+    verbose?: true;
+  }): Promise<RPCResponse<GetBlockHeaderVerbose>>;
+  public async getblockheader(options: {
+    blockhash: string;
+    verbose: false;
+  }): Promise<RPCResponse<GetBlockHeader>>;
+  public async getblockheader(options: {
+    blockhash: string;
+    verbose?: boolean;
+  }) {
+    return await this.request<GetBlockHeader | GetBlockHeaderVerbose>(
+      "getblockheader",
+      options,
+    );
   }
 
   /*
@@ -352,9 +422,12 @@ export default class BitcoinRPC {
         ...
       ]
   */
-  public async getblockstats(options: { hash_or_height: string | number, stats?: (keyof GetBlockStats)[] }) {
+  public async getblockstats(options: {
+    hash_or_height: string | number;
+    stats?: (keyof GetBlockStats)[];
+  }) {
     // @todo can the response know about keys to expect from stats option?
-    return await this.request<GetBlockStats>('getblockstats', options);
+    return await this.request<GetBlockStats>("getblockstats", options);
   }
 
   /*
@@ -363,7 +436,7 @@ export default class BitcoinRPC {
   Return information about all known tips in the block tree, including the main chain as well as orphaned branches.
   */
   public async getchaintips() {
-    return await this.request<GetChainTips>('getchaintips');
+    return await this.request<GetChainTips>("getchaintips");
   }
 
   /*
@@ -375,8 +448,10 @@ export default class BitcoinRPC {
   1. nblocks      (numeric, optional, default=one month) Size of the window in number of blocks
   2. blockhash    (string, optional, default=chain tip) The hash of the block that ends the window.
   */
-  public async getchaintxstats(options: { nblocks?: number, blockhash?: string } = {}) {
-    return await this.request<GetChainTxStats>('getchaintxstats', options);
+  public async getchaintxstats(
+    options: { nblocks?: number; blockhash?: string } = {},
+  ) {
+    return await this.request<GetChainTxStats>("getchaintxstats", options);
   }
 
   /*
@@ -388,7 +463,7 @@ export default class BitcoinRPC {
   1. blockhash    (string, optional, default="hash of current chain tip") The block hash at which to query deployment state
   */
   public async getdeploymentinfo(options: { blockhash?: string } = {}) {
-    return await this.request<GetDeploymentInfo>('getdeploymentinfo', options);
+    return await this.request<GetDeploymentInfo>("getdeploymentinfo", options);
   }
 
   /*
@@ -397,7 +472,7 @@ export default class BitcoinRPC {
   Returns the proof-of-work difficulty as a multiple of the minimum difficulty.
   */
   public async getdifficulty() {
-    return await this.request<GetDifficulty>('getdifficulty');
+    return await this.request<GetDifficulty>("getdifficulty");
   }
 
   /*
@@ -409,10 +484,22 @@ export default class BitcoinRPC {
   1. txid       (string, required) The transaction id (must be in mempool)
   2. verbose    (boolean, optional, default=false) True for a json object, false for array of transaction ids
   */
-  public async getmempoolancestors(options: { txid: string, verbose?: false }): Promise<RPCResponse<GetMempoolAncestors>>;
-  public async getmempoolancestors(options: { txid: string, verbose: true }): Promise<RPCResponse<GetMempoolAncestorsVerbose>>;
-  public async getmempoolancestors(options: { txid: string, verbose?: boolean }) {
-      return await this.request<GetMempoolAncestors | GetMempoolAncestorsVerbose>('getmempoolancestors', options);
+  public async getmempoolancestors(options: {
+    txid: string;
+    verbose?: false;
+  }): Promise<RPCResponse<GetMempoolAncestors>>;
+  public async getmempoolancestors(options: {
+    txid: string;
+    verbose: true;
+  }): Promise<RPCResponse<GetMempoolAncestorsVerbose>>;
+  public async getmempoolancestors(options: {
+    txid: string;
+    verbose?: boolean;
+  }) {
+    return await this.request<GetMempoolAncestors | GetMempoolAncestorsVerbose>(
+      "getmempoolancestors",
+      options,
+    );
   }
 
   /*
@@ -424,10 +511,21 @@ export default class BitcoinRPC {
   1. txid       (string, required) The transaction id (must be in mempool)
   2. verbose    (boolean, optional, default=false) True for a json object, false for array of transaction ids
   */
-  public async getmempooldescendants(options: { txid: string, verbose?: false }): Promise<RPCResponse<GetMempoolDescendants>>;
-  public async getmempooldescendants(options: { txid: string, verbose: true }): Promise<RPCResponse<GetMempoolDescendantsVerbose>>;
-  public async getmempooldescendants(options: { txid: string, verbose?: boolean }) {
-    return await this.request<GetMempoolDescendants | GetMempoolDescendantsVerbose>('getmempooldescendants', options);
+  public async getmempooldescendants(options: {
+    txid: string;
+    verbose?: false;
+  }): Promise<RPCResponse<GetMempoolDescendants>>;
+  public async getmempooldescendants(options: {
+    txid: string;
+    verbose: true;
+  }): Promise<RPCResponse<GetMempoolDescendantsVerbose>>;
+  public async getmempooldescendants(options: {
+    txid: string;
+    verbose?: boolean;
+  }) {
+    return await this.request<
+      GetMempoolDescendants | GetMempoolDescendantsVerbose
+    >("getmempooldescendants", options);
   }
 
   /*
@@ -439,7 +537,7 @@ export default class BitcoinRPC {
   1. txid    (string, required) The transaction id (must be in mempool)
   */
   public async getmempoolentry(options: { txid: string }) {
-    return await this.request<GetMempoolEntry>('getmempoolentry', options);
+    return await this.request<GetMempoolEntry>("getmempoolentry", options);
   }
 
   /*
@@ -448,7 +546,7 @@ export default class BitcoinRPC {
   Returns details on the active state of the TX memory pool.
   */
   public async getmempoolinfo() {
-    return await this.request<GetMempoolInfo>('getmempoolinfo');
+    return await this.request<GetMempoolInfo>("getmempoolinfo");
   }
 
   /*
@@ -462,11 +560,22 @@ export default class BitcoinRPC {
   1. verbose             (boolean, optional, default=false) True for a json object, false for array of transaction ids
   2. mempool_sequence    (boolean, optional, default=false) If verbose=false, returns a json object with transaction list and mempool sequence number attached.
   */
-  public async getrawmempool(options: { verbose: true }): Promise<RPCResponse<GetRawMempoolVerbose>>;
-  public async getrawmempool(options: { verbose: false, mempool_sequence: true }): Promise<RPCResponse<GetRawmempoolSequence>>;
-  public async getrawmempool(options?: { verbose?: false }): Promise<RPCResponse<GetRawMempool>>;
-  public async getrawmempool(options: { verbose?: boolean, mempool_sequence?: boolean } = {}) {
-    return await this.request<GetRawMempool | GetRawMempoolVerbose | GetRawmempoolSequence>('getrawmempool', options);
+  public async getrawmempool(options: {
+    verbose: true;
+  }): Promise<RPCResponse<GetRawMempoolVerbose>>;
+  public async getrawmempool(options: {
+    verbose: false;
+    mempool_sequence: true;
+  }): Promise<RPCResponse<GetRawmempoolSequence>>;
+  public async getrawmempool(options?: {
+    verbose?: false;
+  }): Promise<RPCResponse<GetRawMempool>>;
+  public async getrawmempool(
+    options: { verbose?: boolean; mempool_sequence?: boolean } = {},
+  ) {
+    return await this.request<
+      GetRawMempool | GetRawMempoolVerbose | GetRawmempoolSequence
+    >("getrawmempool", options);
   }
 
   /*
@@ -479,8 +588,12 @@ export default class BitcoinRPC {
   2. n                  (numeric, required) vout number
   3. include_mempool    (boolean, optional, default=true) Whether to include the mempool. Note that an unspent output that is spent in the mempool won't appear.
   */
-  public async gettxout(options: { txid: string, n: number, include_mempool?: boolean }) {
-    return await this.request<GetTxout>('gettxout', options);
+  public async gettxout(options: {
+    txid: string;
+    n: number;
+    include_mempool?: boolean;
+  }) {
+    return await this.request<GetTxout>("gettxout", options);
   }
 
   /*
@@ -501,8 +614,8 @@ export default class BitcoinRPC {
       ]
   2. blockhash      (string, optional) If specified, looks for txid in the block with this hash
   */
-  public async gettxoutproof(options: { txids: string[], blockhash?: string }) {
-    return await this.request<GetTxoutProof>('gettxoutproof', options);
+  public async gettxoutproof(options: { txids: string[]; blockhash?: string }) {
+    return await this.request<GetTxoutProof>("gettxoutproof", options);
   }
 
   /*
@@ -516,8 +629,14 @@ export default class BitcoinRPC {
   2. hash_or_height    (string or numeric, optional, default=the current best block) The block hash or height of the target height (only available with coinstatsindex).
   3. use_index         (boolean, optional, default=true) Use coinstatsindex, if available.
   */
-  public async gettxoutsetinfo(options: { hash_type?: 'hash_serialized_2' | 'muhash' | 'none', hash_or_height?: string | number, use_index?: boolean } = {}) {
-    return await this.request<GetTxoutSetInfo>('gettxoutsetinfo', options);
+  public async gettxoutsetinfo(
+    options: {
+      hash_type?: "hash_serialized_2" | "muhash" | "none";
+      hash_or_height?: string | number;
+      use_index?: boolean;
+    } = {},
+  ) {
+    return await this.request<GetTxoutSetInfo>("gettxoutsetinfo", options);
   }
 
   /*
@@ -535,8 +654,13 @@ export default class BitcoinRPC {
         ...
       ]
   */
-  public async gettxspendingprevout(options: { outputs: Array<{ txid: string, vout: number }> }) {
-    return await this.request<GetTxSpendingPrevout>('gettxspendingprevout', options);
+  public async gettxspendingprevout(options: {
+    outputs: Array<{ txid: string; vout: number }>;
+  }) {
+    return await this.request<GetTxSpendingPrevout>(
+      "gettxspendingprevout",
+      options,
+    );
   }
 
   /*
@@ -552,7 +676,7 @@ export default class BitcoinRPC {
   1. blockhash    (string, required) the hash of the block to mark as precious
   */
   public async preciousblock(options: { blockhash: string }) {
-    return await this.request<PreciousBlock>('preciousblock', options);
+    return await this.request<PreciousBlock>("preciousblock", options);
   }
 
   /*
@@ -563,16 +687,16 @@ export default class BitcoinRPC {
               to prune blocks whose block time is at least 2 hours older than the provided timestamp.
   */
   public async pruneblockchain(options: { height: number }) {
-    return await this.request<PruneBlockchain>('pruneblockchain', options);
+    return await this.request<PruneBlockchain>("pruneblockchain", options);
   }
 
-  /* 
+  /*
   savemempool
 
   Dumps the mempool to disk. It will fail until the previous dump is fully loaded.
   */
   public async savemempool() {
-    return await this.request<SaveMempool>('savemempool');
+    return await this.request<SaveMempool>("savemempool");
   }
 
   /*
@@ -608,11 +732,27 @@ export default class BitcoinRPC {
         ...
       ]
   */
-  public async scantxoutset(options: { action: 'start', scanobjects: Array<{ descriptor: { desc: string, range: number | [number, number] } }>}): Promise<RPCResponse<ScanTxoutSetStart>>;
-  public async scantxoutset(options: { action: 'abort' }): Promise<RPCResponse<ScanTxoutSetAbort>>;
-  public async scantxoutset(options: { action: 'status' }): Promise<RPCResponse<ScanTxoutSetStatus>>;
-  public async scantxoutset(options: { action: 'start' | 'abort' | 'status', scanobjects?: Array<{ descriptor: { desc: string, range: number | [number, number] } }> }) {
-    return await this.request<ScanTxoutSetStart | ScanTxoutSetAbort | ScanTxoutSetStatus>('scantxoutset', options);
+  public async scantxoutset(options: {
+    action: "start";
+    scanobjects: Array<{
+      descriptor: { desc: string; range: number | [number, number] };
+    }>;
+  }): Promise<RPCResponse<ScanTxoutSetStart>>;
+  public async scantxoutset(options: {
+    action: "abort";
+  }): Promise<RPCResponse<ScanTxoutSetAbort>>;
+  public async scantxoutset(options: {
+    action: "status";
+  }): Promise<RPCResponse<ScanTxoutSetStatus>>;
+  public async scantxoutset(options: {
+    action: "start" | "abort" | "status";
+    scanobjects?: Array<{
+      descriptor: { desc: string; range: number | [number, number] };
+    }>;
+  }) {
+    return await this.request<
+      ScanTxoutSetStart | ScanTxoutSetAbort | ScanTxoutSetStatus
+    >("scantxoutset", options);
   }
 
   /*
@@ -630,8 +770,10 @@ export default class BitcoinRPC {
                   - each level includes the checks of the previous levels
   2. nblocks       (numeric, optional, default=6, 0=all) The number of blocks to check.
   */
-  public async verifychain(options: { checklevel?: 0 | 1 | 2 | 3 | 4, nblocks?: number } = {}) {
-    return await this.request<VerifyChain>('verifychain', options);
+  public async verifychain(
+    options: { checklevel?: 0 | 1 | 2 | 3 | 4; nblocks?: number } = {},
+  ) {
+    return await this.request<VerifyChain>("verifychain", options);
   }
 
   /*
@@ -644,7 +786,7 @@ export default class BitcoinRPC {
   1. proof    (string, required) The hex-encoded proof generated by gettxoutproof
   */
   public async verifytxoutproof(options: { proof: string }) {
-    return await this.request<VerifyTxoutProof>('verifytxoutproof', options);
+    return await this.request<VerifyTxoutProof>("verifytxoutproof", options);
   }
 
   // Control RPC
@@ -659,19 +801,26 @@ export default class BitcoinRPC {
              - "stats" returns general statistics about memory usage in the daemon.
              - "mallocinfo" returns an XML string describing low-level heap state (only available if compiled with glibc 2.10+).
   */
-  public async getmemoryinfo(options?: { mode?: 'stats' }): Promise<RPCResponse<GetMemoryInfoStats>>
-  public async getmemoryinfo(options: { mode: 'mallocinfo' }): Promise<RPCResponse<GetMemoryInfoMallocInfo>>
-  public async getmemoryinfo(options: { mode?: 'stats' | 'mallocinfo' } = {}) {
-    return await this.request<GetMemoryInfoStats | GetMemoryInfoMallocInfo>('getmemoryinfo', options);
+  public async getmemoryinfo(options?: {
+    mode?: "stats";
+  }): Promise<RPCResponse<GetMemoryInfoStats>>;
+  public async getmemoryinfo(options: {
+    mode: "mallocinfo";
+  }): Promise<RPCResponse<GetMemoryInfoMallocInfo>>;
+  public async getmemoryinfo(options: { mode?: "stats" | "mallocinfo" } = {}) {
+    return await this.request<GetMemoryInfoStats | GetMemoryInfoMallocInfo>(
+      "getmemoryinfo",
+      options,
+    );
   }
 
-  /* 
+  /*
   getrpcinfo
 
   Returns details of the RPC server.
   */
   public async getrpcinfo() {
-    return await this.request<GetRpcInfo>('getrpcinfo');
+    return await this.request<GetRpcInfo>("getrpcinfo");
   }
 
   /*
@@ -683,7 +832,7 @@ export default class BitcoinRPC {
   1. command    (string, optional, default=all commands) The command to get help on
   */
   public async help(options: { command?: string } = {}) {
-    return await this.request<Help>('help', options);
+    return await this.request<Help>("help", options);
   }
 
   /*
@@ -711,8 +860,10 @@ export default class BitcoinRPC {
         ...
       ]
   */
-  public async logging(options: { include?: LoggingCategory[], exclude?: LoggingCategory[] } = {}) {
-    return await this.request<Logging>('logging', options);
+  public async logging(
+    options: { include?: LoggingCategory[]; exclude?: LoggingCategory[] } = {},
+  ) {
+    return await this.request<Logging>("logging", options);
   }
 
   /*
@@ -721,7 +872,7 @@ export default class BitcoinRPC {
   Request a graceful shutdown of Bitcoin Core.
   */
   public async stop() {
-    return await this.request<Stop>('stop');
+    return await this.request<Stop>("stop");
   }
 
   /*
@@ -730,7 +881,7 @@ export default class BitcoinRPC {
   Returns the total uptime of the server.
   */
   public async uptime() {
-    return await this.request<Uptime>('uptime');
+    return await this.request<Uptime>("uptime");
   }
 
   // Mining RPC
@@ -762,8 +913,10 @@ export default class BitcoinRPC {
       }
   */
   // @todo unsure if it's possible to overload this method with different return types
-  public async getblocktemplate(options: { template_request?: getblocktemplate_template_request } = {}) {
-    return await this.request<GetBlockTemplate>('getblocktemplate', options);
+  public async getblocktemplate(
+    options: { template_request?: getblocktemplate_template_request } = {},
+  ) {
+    return await this.request<GetBlockTemplate>("getblocktemplate", options);
   }
 
   /*
@@ -772,7 +925,7 @@ export default class BitcoinRPC {
   Returns a json object containing mining-related information.
   */
   public async getmininginfo() {
-    return await this.request<GetMiningInfo>('getmininginfo');
+    return await this.request<GetMiningInfo>("getmininginfo");
   }
 
   /*
@@ -786,8 +939,10 @@ export default class BitcoinRPC {
   1. nblocks    (numeric, optional, default=120) The number of blocks, or -1 for blocks since last difficulty change.
   2. height     (numeric, optional, default=-1) To estimate at the time of the given height.
   */
-  public async getnetworkhashps(options: { nblocks?: number, height?: number } = {}) {
-    return await this.request<GetNetworkHashps>('getnetworkhashps', options);
+  public async getnetworkhashps(
+    options: { nblocks?: number; height?: number } = {},
+  ) {
+    return await this.request<GetNetworkHashps>("getnetworkhashps", options);
   }
 
   /*
@@ -804,12 +959,19 @@ export default class BitcoinRPC {
                   The fee is not actually paid, only the algorithm for selecting transactions into a block
                   considers the transaction as it would have paid a higher (or lower) fee.
   */
-  public async prioritisetransaction(options: { txid: string, fee_delta: number, dummy?: 0 | null }) {
+  public async prioritisetransaction(options: {
+    txid: string;
+    fee_delta: number;
+    dummy?: 0 | null;
+  }) {
     options.dummy ??= 0;
-    return await this.request<PrioritiseTransaction>('prioritisetransaction', options);
+    return await this.request<PrioritiseTransaction>(
+      "prioritisetransaction",
+      options,
+    );
   }
 
-  /* 
+  /*
   submitblock "hexdata" ( "dummy" )
 
   Attempts to submit new block to network.
@@ -819,8 +981,8 @@ export default class BitcoinRPC {
   1. hexdata    (string, required) the hex-encoded block data to submit
   2. dummy      (string, optional, default=ignored) dummy value, for compatibility with BIP22. This value is ignored.
   */
-  public async submitblock(options: { hexdata: string, dummy?: string }) {
-    return await this.request<SubmitBlock>('submitblock', options);
+  public async submitblock(options: { hexdata: string; dummy?: string }) {
+    return await this.request<SubmitBlock>("submitblock", options);
   }
 
   /*
@@ -833,7 +995,7 @@ export default class BitcoinRPC {
   1. hexdata    (string, required) the hex-encoded block header data
   */
   public async submitheader(options: { hexdata: string }) {
-    return await this.request<SubmitHeader>('submitheader', options);
+    return await this.request<SubmitHeader>("submitheader", options);
   }
 
   // Network RPC
@@ -851,8 +1013,11 @@ export default class BitcoinRPC {
   1. node       (string, required) The node (see getpeerinfo for nodes)
   2. command    (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list, 'onetry' to try a connection to the node once
   */
-  public async addnode(options: { node: string, command: 'add' | 'remove' | 'onetry' }) {
-    return await this.request<AddNode>('addnode', options);
+  public async addnode(options: {
+    node: string;
+    command: "add" | "remove" | "onetry";
+  }) {
+    return await this.request<AddNode>("addnode", options);
   }
 
   /*
@@ -861,7 +1026,7 @@ export default class BitcoinRPC {
   Clear all banned IPs.
   */
   public async clearbanned() {
-    return await this.request<ClearBanned>('clearbanned');
+    return await this.request<ClearBanned>("clearbanned");
   }
 
   /*
@@ -877,8 +1042,10 @@ export default class BitcoinRPC {
   1. address    (string, optional, default=fallback to nodeid) The IP address/port of the node
   2. nodeid     (numeric, optional, default=fallback to address) The node ID (see getpeerinfo for node IDs)
   */
-  public async disconnectnode(options: { address?: string, nodeid?: number } = {}) {
-    return await this.request<DisconnectNode>('disconnectnode', options);
+  public async disconnectnode(
+    options: { address?: string; nodeid?: number } = {},
+  ) {
+    return await this.request<DisconnectNode>("disconnectnode", options);
   }
 
   /*
@@ -891,7 +1058,7 @@ export default class BitcoinRPC {
   1. node    (string, optional, default=all nodes) If provided, return information about this specific node, otherwise all nodes are returned.
   */
   public async getaddednodeinfo(options: { node?: string } = {}) {
-    return await this.request<GetAddedNodeInfo>('getaddednodeinfo', options);
+    return await this.request<GetAddedNodeInfo>("getaddednodeinfo", options);
   }
 
   /*
@@ -900,7 +1067,7 @@ export default class BitcoinRPC {
   Returns the number of connections to other nodes.
   */
   public async getconnectioncount() {
-    return await this.request<GetConnectionCount>('getconnectioncount');
+    return await this.request<GetConnectionCount>("getconnectioncount");
   }
 
   /*
@@ -910,7 +1077,7 @@ export default class BitcoinRPC {
   and current time.
   */
   public async getnettotals() {
-    return await this.request<GetNetTotals>('getnettotals');
+    return await this.request<GetNetTotals>("getnettotals");
   }
 
   /*
@@ -919,7 +1086,7 @@ export default class BitcoinRPC {
   Returns an object containing various state info regarding P2P networking.
   */
   public async getnetworkinfo() {
-    return await this.request<GetNetworkInfo>('getnetworkinfo');
+    return await this.request<GetNetworkInfo>("getnetworkinfo");
   }
 
   /*
@@ -933,8 +1100,13 @@ export default class BitcoinRPC {
   1. count      (numeric, optional, default=1) The maximum number of addresses to return. Specify 0 to return all known addresses.
   2. network    (string, optional, default=all networks) Return only addresses of the specified network. Can be one of: ipv4, ipv6, onion, i2p, cjdns.
   */
-  public async getnodeaddresses(options: { count?: number, network?: 'ipv4' | 'ipv6' | 'onion' | 'i2p' | 'cjdns' } = {}) {
-    return await this.request<GetNodeAddresses>('getnodeaddresses', options);
+  public async getnodeaddresses(
+    options: {
+      count?: number;
+      network?: "ipv4" | "ipv6" | "onion" | "i2p" | "cjdns";
+    } = {},
+  ) {
+    return await this.request<GetNodeAddresses>("getnodeaddresses", options);
   }
 
   /*
@@ -943,7 +1115,7 @@ export default class BitcoinRPC {
   Returns data about each connected network peer as a json array of objects.
   */
   public async getpeerinfo() {
-    return await this.request<GetPeerInfo>('getpeerinfo');
+    return await this.request<GetPeerInfo>("getpeerinfo");
   }
 
   /*
@@ -952,7 +1124,7 @@ export default class BitcoinRPC {
   List all manually banned IPs/Subnets.
   */
   public async listbanned() {
-    return await this.request<ListBanned>('listbanned');
+    return await this.request<ListBanned>("listbanned");
   }
 
   /*
@@ -963,7 +1135,7 @@ export default class BitcoinRPC {
   Ping command is handled in queue with all other commands, so it measures processing backlog, not just network ping.
   */
   public async ping() {
-    return await this.request<Ping>('ping');
+    return await this.request<Ping>("ping");
   }
 
   /*
@@ -977,8 +1149,13 @@ export default class BitcoinRPC {
   3. bantime     (numeric, optional, default=0) time in seconds how long (or until when if [absolute] is set) the IP is banned (0 or empty means using the default time of 24h which can also be overwritten by the -bantime startup argument)
   4. absolute    (boolean, optional, default=false) If set, the bantime must be an absolute timestamp expressed in UNIX epoch time
   */
-  public async setban(options: { subnet: string, command: 'add' | 'remove', bantime?: number, absolute?: boolean }) {
-    return await this.request<SetBan>('setban', options);
+  public async setban(options: {
+    subnet: string;
+    command: "add" | "remove";
+    bantime?: number;
+    absolute?: boolean;
+  }) {
+    return await this.request<SetBan>("setban", options);
   }
 
   /*
@@ -990,12 +1167,12 @@ export default class BitcoinRPC {
   1. state    (boolean, required) true to enable networking, false to disable
   */
   public async setnetworkactive(options: { state: boolean }) {
-    return await this.request<SetNetworkActive>('setnetworkactive', options);
+    return await this.request<SetNetworkActive>("setnetworkactive", options);
   }
 
   // Raw Transactions RPC
-  
-  /* 
+
+  /*
   analyzepsbt "psbt"
 
   Analyzes and provides information about the current status of a PSBT and its inputs
@@ -1004,7 +1181,7 @@ export default class BitcoinRPC {
   1. psbt    (string, required) A base64 string of a PSBT
   */
   public async nalyzepsbt(options: { psbt: string }) {
-    return await this.request<AnalyzePsbt>('analyzepsbt', options);
+    return await this.request<AnalyzePsbt>("analyzepsbt", options);
   }
 
   /*
@@ -1021,14 +1198,14 @@ export default class BitcoinRPC {
       ]
   */
   public async combinepsbt(options: { txs: string[] }) {
-    return await this.request<CombinePsbt>('combinepsbt', options);
+    return await this.request<CombinePsbt>("combinepsbt", options);
   }
 
   /*
   combinerawtransaction ["hexstring",...]
 
   Combine multiple partially signed transactions into one transaction.
-  The combined transaction may be another partially signed transaction or a 
+  The combined transaction may be another partially signed transaction or a
   fully signed transaction.
 
   Arguments:
@@ -1039,7 +1216,10 @@ export default class BitcoinRPC {
       ]
   */
   public async combinerawtransaction(options: { txs: string[] }) {
-    return await this.request<CombineRawTransaction>('combinerawtransaction', options);
+    return await this.request<CombineRawTransaction>(
+      "combinerawtransaction",
+      options,
+    );
   }
 
   /*
@@ -1059,8 +1239,12 @@ export default class BitcoinRPC {
                       This boolean should reflect whether the transaction has inputs
                       (e.g. fully valid, or on-chain transactions), if known by the caller.
   */
-  public async converttopsbt(options: { hexstring: string, permitsigdata?: boolean, iswitness?: boolean }) {
-    return await this.request<ConvertToPsbt>('converttopsbt', options);
+  public async converttopsbt(options: {
+    hexstring: string;
+    permitsigdata?: boolean;
+    iswitness?: boolean;
+  }) {
+    return await this.request<ConvertToPsbt>("converttopsbt", options);
   }
 
   /*
@@ -1099,15 +1283,20 @@ export default class BitcoinRPC {
   */
   public async createpsbt(options: {
     inputs: {
-      txid: string, vout: number, sequence?: number
-    },
-    outputs: Array<{
-      [key: string]: string | number;
-    } | { data: string }>,
-    locktime?: number,
-    replaceable?: boolean
+      txid: string;
+      vout: number;
+      sequence?: number;
+    };
+    outputs: Array<
+      | {
+          [key: string]: string | number;
+        }
+      | { data: string }
+    >;
+    locktime?: number;
+    replaceable?: boolean;
   }) {
-    return await this.request<CreatePsbt>('createpsbt', options);
+    return await this.request<CreatePsbt>("createpsbt", options);
   }
 
   /*
@@ -1149,15 +1338,23 @@ export default class BitcoinRPC {
   */
   public async createrawtransaction(options: {
     inputs: {
-      txid: string, vout: number, sequence?: number
-    },
-    outputs: Array<{
-      [key: string]: string | number;
-    } | { data: string }>,
-    locktime?: number,
-    replaceable?: boolean
+      txid: string;
+      vout: number;
+      sequence?: number;
+    };
+    outputs: Array<
+      | {
+          [key: string]: string | number;
+        }
+      | { data: string }
+    >;
+    locktime?: number;
+    replaceable?: boolean;
   }) {
-    return await this.request<CreateRawTransaction>('createrawtransaction', options);
+    return await this.request<CreateRawTransaction>(
+      "createrawtransaction",
+      options,
+    );
   }
 
   /*
@@ -1169,7 +1366,7 @@ export default class BitcoinRPC {
   1. psbt    (string, required) The PSBT base64 string
   */
   public async decodepsbt(options: { psbt: string }) {
-    return await this.request<DecodePsbt>('decodepsbt', options);
+    return await this.request<DecodePsbt>("decodepsbt", options);
   }
 
   /*
@@ -1186,8 +1383,14 @@ export default class BitcoinRPC {
                   This boolean should reflect whether the transaction has inputs
                   (e.g. fully valid, or on-chain transactions), if known by the caller.
   */
-  public async decoderawtransaction(options: { hexstring: string, iswitness?: boolean }) {
-    return await this.request<DecodeRawTransaction>('decoderawtransaction', options);
+  public async decoderawtransaction(options: {
+    hexstring: string;
+    iswitness?: boolean;
+  }) {
+    return await this.request<DecodeRawTransaction>(
+      "decoderawtransaction",
+      options,
+    );
   }
 
   /*
@@ -1199,7 +1402,7 @@ export default class BitcoinRPC {
   1. hexstring    (string, required) the hex-encoded script
   */
   public async decodescript(options: { hexstring: string }) {
-    return await this.request<DecodeScript>('decodescript', options);
+    return await this.request<DecodeScript>("decodescript", options);
   }
 
   /*
@@ -1215,8 +1418,8 @@ export default class BitcoinRPC {
   2. extract    (boolean, optional, default=true) If true and the transaction is complete,
                 extract and return the complete transaction in normal network serialization instead of the PSBT.
   */
-  public async finalizepsbt(options: { psbt: string, extract?: boolean }) {
-    return await this.request<FinalizePsbt>('finalizepsbt', options);
+  public async finalizepsbt(options: { psbt: string; extract?: boolean }) {
+    return await this.request<FinalizePsbt>("finalizepsbt", options);
   }
 
   /*
@@ -1295,8 +1498,15 @@ export default class BitcoinRPC {
                                         This boolean should reflect whether the transaction has inputs
                                         (e.g. fully valid, or on-chain transactions), if known by the caller.
   */
-  public async fundrawtransaction(options: { hexstring: string, options?: FundrawtransactionInputOptions, iswitness?: boolean }) {
-    return await this.request<FundRawTransaction>('fundrawtransaction', options);
+  public async fundrawtransaction(options: {
+    hexstring: string;
+    options?: FundrawtransactionInputOptions;
+    iswitness?: boolean;
+  }) {
+    return await this.request<FundRawTransaction>(
+      "fundrawtransaction",
+      options,
+    );
   }
 
   /*
@@ -1319,10 +1529,25 @@ export default class BitcoinRPC {
   2. verbose      (boolean, optional, default=false) If false, return a string, otherwise return a json object
   3. blockhash    (string, optional) The block in which to look for the transaction
   */
-  public async getrawtransaction(options: { txid: string, verbose: true, blockhash?: string }): Promise<RPCResponse<GetRawTransaction>>
-  public async getrawtransaction(options: { txid: string, verbose?: false, blockhash?: string }): Promise<RPCResponse<GetRawTransactionHexEncoded>>
-  public async getrawtransaction(options: { txid: string, verbose?: boolean, blockhash?: string }) {
-    return await this.request<GetRawTransaction | GetRawTransactionHexEncoded>('getrawtransaction', options);
+  public async getrawtransaction(options: {
+    txid: string;
+    verbose: true;
+    blockhash?: string;
+  }): Promise<RPCResponse<GetRawTransaction>>;
+  public async getrawtransaction(options: {
+    txid: string;
+    verbose?: false;
+    blockhash?: string;
+  }): Promise<RPCResponse<GetRawTransactionHexEncoded>>;
+  public async getrawtransaction(options: {
+    txid: string;
+    verbose?: boolean;
+    blockhash?: string;
+  }) {
+    return await this.request<GetRawTransaction | GetRawTransactionHexEncoded>(
+      "getrawtransaction",
+      options,
+    );
   }
 
   /*
@@ -1339,7 +1564,7 @@ export default class BitcoinRPC {
       ]
   */
   public async joinpsbts(options: { txs: string[] }) {
-    return await this.request<JoinPsbts>('joinpsbts', options);
+    return await this.request<JoinPsbts>("joinpsbts", options);
   }
 
   /*
@@ -1360,8 +1585,14 @@ export default class BitcoinRPC {
   2. maxfeerate    (numeric or string, optional, default="0.10") Reject transactions whose fee rate is higher than the specified value, expressed in BTC/kvB.
                   Set to 0 to accept any fee rate.
   */
-  public async sendrawtransaction(options: { hexstring: string, maxfeerate?: number | string }) {
-    return await this.request<SendRawTransaction>('sendrawtransaction', options);
+  public async sendrawtransaction(options: {
+    hexstring: string;
+    maxfeerate?: number | string;
+  }) {
+    return await this.request<SendRawTransaction>(
+      "sendrawtransaction",
+      options,
+    );
   }
 
   /*
@@ -1402,8 +1633,8 @@ export default class BitcoinRPC {
                                       "SINGLE|ANYONECANPAY"
   */
   public async SignRawTransactionWithKey(options: {
-    hexstring: string,
-    privkeys: string[],
+    hexstring: string;
+    privkeys: string[];
     prevtxs?: Array<{
       txid: string;
       vout: number;
@@ -1411,10 +1642,13 @@ export default class BitcoinRPC {
       redeemScript?: string;
       witnessScript?: string;
       amount?: number | string;
-    }>,
-    sighashtype?: string
+    }>;
+    sighashtype?: string;
   }) {
-    return await this.request<SignRawTransactionWithKey>('signrawtransactionwithkey', options);
+    return await this.request<SignRawTransactionWithKey>(
+      "signrawtransactionwithkey",
+      options,
+    );
   }
 
   /*
@@ -1440,8 +1674,11 @@ export default class BitcoinRPC {
       ]
   2. maxfeerate      (numeric or string, optional, default="0.10") Reject transactions whose fee rate is higher than the specified value, expressed in BTC/kvB
   */
-  public async testmempoolaccept(options: { rawtxs: string[], maxfeerate?: number | string }) {
-    return await this.request<TestMempoolAccept>('testmempoolaccept', options);
+  public async testmempoolaccept(options: {
+    rawtxs: string[];
+    maxfeerate?: number | string;
+  }) {
+    return await this.request<TestMempoolAccept>("testmempoolaccept", options);
   }
 
   /*
@@ -1462,13 +1699,16 @@ export default class BitcoinRPC {
       ]
   */
   public async utxoupdatepsbt(options: {
-    psbt: string,
-    descriptors?: Array<string | {
-      desc: string;
-      range?: number | [number, number];
-    }>,
+    psbt: string;
+    descriptors?: Array<
+      | string
+      | {
+          desc: string;
+          range?: number | [number, number];
+        }
+    >;
   }) {
-    return await this.request<UtxoUpdatePsbt>('utxoupdatepsbt', options);
+    return await this.request<UtxoUpdatePsbt>("utxoupdatepsbt", options);
   }
 
   // Signer RPC
@@ -1479,7 +1719,7 @@ export default class BitcoinRPC {
   Returns a list of external signers from -signer.
   */
   public async enumeratesigners() {
-    return await this.request<EnumerateSigners>('enumeratesigners');
+    return await this.request<EnumerateSigners>("enumeratesigners");
   }
 
   // Util RPC
@@ -1499,8 +1739,12 @@ export default class BitcoinRPC {
       ]
   3. address_type    (string, optional, default="legacy") The address type to use. Options are "legacy", "p2sh-segwit", and "bech32".
   */
-  public async createmultisig(options: { nrequired: number, keys: string[], address_type?: 'legacy' | 'p2sh-segwit' | 'bech32' }) {
-    return await this.request<CreateMultisig>('createmultisig', options);
+  public async createmultisig(options: {
+    nrequired: number;
+    keys: string[];
+    address_type?: "legacy" | "p2sh-segwit" | "bech32";
+  }) {
+    return await this.request<CreateMultisig>("createmultisig", options);
   }
 
   /*
@@ -1521,8 +1765,11 @@ export default class BitcoinRPC {
   1. descriptor    (string, required) The descriptor.
   2. range         (numeric or array, optional) If a ranged descriptor is used, this specifies the end or the range (in [begin,end] notation) to derive.
   */
-  public async deriveaddresses(options: { descriptor: string, range?: number | number[] }) {
-    return await this.request<DeriveAddresses>('deriveaddresses', options);
+  public async deriveaddresses(options: {
+    descriptor: string;
+    range?: number | number[];
+  }) {
+    return await this.request<DeriveAddresses>("deriveaddresses", options);
   }
 
   /*
@@ -1545,8 +1792,11 @@ export default class BitcoinRPC {
                       "economical"
                       "conservative"
   */
-  public async estimatesmartfee(options: { conf_target: number, estimate_mode?: 'unset' | 'economical' | 'conservative' }) {
-    return await this.request<EstimateSmartFee>('estimatesmartfee', options);
+  public async estimatesmartfee(options: {
+    conf_target: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+  }) {
+    return await this.request<EstimateSmartFee>("estimatesmartfee", options);
   }
 
   /*
@@ -1558,7 +1808,7 @@ export default class BitcoinRPC {
   1. descriptor    (string, required) The descriptor.
   */
   public async getdescriptorinfo(options: { descriptor: string }) {
-    return await this.request<GetDescriptorInfo>('getdescriptorinfo', options);
+    return await this.request<GetDescriptorInfo>("getdescriptorinfo", options);
   }
 
   /*
@@ -1570,7 +1820,7 @@ export default class BitcoinRPC {
   1. index_name    (string, optional) Filter results for an index with a specific name.
   */
   public async getindexinfo(options: { index_name?: string } = {}) {
-    return await this.request<GetIndexInfo>('getindexinfo', options);
+    return await this.request<GetIndexInfo>("getindexinfo", options);
   }
 
   /*
@@ -1582,8 +1832,14 @@ export default class BitcoinRPC {
   1. privkey    (string, required) The private key to sign the message with.
   2. message    (string, required) The message to create a signature of.
   */
-  public async signmessagewithprivkey(options: { privkey: string, message: string }) {
-    return await this.request<SignMessageWithPrivkey>('signmessagewithprivkey', options);
+  public async signmessagewithprivkey(options: {
+    privkey: string;
+    message: string;
+  }) {
+    return await this.request<SignMessageWithPrivkey>(
+      "signmessagewithprivkey",
+      options,
+    );
   }
 
   /*
@@ -1595,7 +1851,7 @@ export default class BitcoinRPC {
   1. address    (string, required) The bitcoin address to validate
   */
   public async validateaddress(options: { address: string }) {
-    return await this.request<ValidateAddress>('validateaddress', options);
+    return await this.request<ValidateAddress>("validateaddress", options);
   }
 
   /*
@@ -1608,8 +1864,12 @@ export default class BitcoinRPC {
   2. signature    (string, required) The signature provided by the signer in base 64 encoding (see signmessage).
   3. message      (string, required) The message that was signed.
   */
-  public async verifymessage(options: { address: string, signature: string, message: string }) {
-    return await this.request<VerifyMessage>('verifymessage', options);
+  public async verifymessage(options: {
+    address: string;
+    signature: string;
+    message: string;
+  }) {
+    return await this.request<VerifyMessage>("verifymessage", options);
   }
 
   // Wallet RPC
@@ -1627,7 +1887,10 @@ export default class BitcoinRPC {
   1. txid    (string, required) The transaction id
   */
   public async abandontransaction(options: { txid: string }) {
-    return await this.request<AbandonTransaction>('abandontransaction', options);
+    return await this.request<AbandonTransaction>(
+      "abandontransaction",
+      options,
+    );
   }
 
   /*
@@ -1637,7 +1900,7 @@ export default class BitcoinRPC {
   Note: Use "getwalletinfo" to query the scanning progress.
   */
   public async abortrescan() {
-    return await this.request<AbortRescan>('abortrescan');
+    return await this.request<AbortRescan>("abortrescan");
   }
 
   /*
@@ -1659,8 +1922,16 @@ export default class BitcoinRPC {
   3. label           (string, optional) A label to assign the addresses to.
   4. address_type    (string, optional, default=set by -addresstype) The address type to use. Options are "legacy", "p2sh-segwit", and "bech32".
   */
-  public async addmultisigaddress(options: { nrequired: number, keys: string[], label?: string, address_type?: 'legacy' | 'p2sh-segwit' | 'bech32' }) {
-    return await this.request<AddMultisigAddress>('addmultisigaddress', options);
+  public async addmultisigaddress(options: {
+    nrequired: number;
+    keys: string[];
+    label?: string;
+    address_type?: "legacy" | "p2sh-segwit" | "bech32";
+  }) {
+    return await this.request<AddMultisigAddress>(
+      "addmultisigaddress",
+      options,
+    );
   }
 
   /*
@@ -1672,7 +1943,7 @@ export default class BitcoinRPC {
   1. destination    (string, required) The destination directory or file
   */
   public async backupwallet(options: { destination: string }) {
-    return await this.request<BackupWallet>('backupwallet', options);
+    return await this.request<BackupWallet>("backupwallet", options);
   }
 
   /*
@@ -1696,12 +1967,12 @@ export default class BitcoinRPC {
   2. options                        (json object, optional)
       {
         "conf_target": n,          (numeric, optional, default=wallet -txconfirmtarget) Confirmation target in blocks
-                                    
-        "fee_rate": amount,        (numeric or string, optional, default=not set, fall back to wallet fee estimation) 
+
+        "fee_rate": amount,        (numeric or string, optional, default=not set, fall back to wallet fee estimation)
                                     Specify a fee rate in sat/vB instead of relying on the built-in fee estimator.
                                     Must be at least 1.000 sat/vB higher than the current transaction fee rate.
                                     WARNING: before version 0.21, fee_rate was in BTC/kvB. As of 0.21, fee_rate is in sat/vB.
-                                    
+
         "replaceable": bool,       (boolean, optional, default=true) Whether the new transaction should still be
                                     marked bip-125 replaceable. If true, the sequence numbers in the transaction will
                                     be left unchanged from the original. If false, any input sequence numbers in the
@@ -1709,15 +1980,23 @@ export default class BitcoinRPC {
                                     so the new transaction will not be explicitly bip-125 replaceable (though it may
                                     still be replaceable in practice, for example if it has unconfirmed ancestors which
                                     are replaceable).
-                                    
+
         "estimate_mode": "str",    (string, optional, default="unset") The fee estimate mode, must be one of (case insensitive):
                                     "unset"
                                     "economical"
                                     "conservative"
       }
   */
-  public async bumpfee(options: { txid: string, options?: { conf_target?: number, fee_rate?: number | string, replaceable?: boolean, estimate_mode?: 'unset' | 'economical' | 'conservative' } }) {
-    return await this.request<BumpFee>('bumpfee', options);
+  public async bumpfee(options: {
+    txid: string;
+    options?: {
+      conf_target?: number;
+      fee_rate?: number | string;
+      replaceable?: boolean;
+      estimate_mode?: "unset" | "economical" | "conservative";
+    };
+  }) {
+    return await this.request<BumpFee>("bumpfee", options);
   }
 
   /*
@@ -1735,8 +2014,17 @@ export default class BitcoinRPC {
   7. load_on_startup         (boolean, optional) Save wallet name to persistent settings and load on startup. True to add wallet to startup list, false to remove, null to leave unchanged.
   8. external_signer         (boolean, optional, default=false) Use an external signer such as a hardware wallet. Requires -signer to be configured. Wallet creation will fail if keys cannot be fetched. Requires disable_private_keys and descriptors set to true.
   */
-  public async createwallet(options: { wallet_name: string, disable_private_keys?: boolean, blank?: boolean, passphrase?: string, avoid_reuse?: boolean, descriptors?: boolean, load_on_startup?: boolean, external_signer?: boolean }) {
-    return await this.request<CreateWallet>('createwallet', options);
+  public async createwallet(options: {
+    wallet_name: string;
+    disable_private_keys?: boolean;
+    blank?: boolean;
+    passphrase?: string;
+    avoid_reuse?: boolean;
+    descriptors?: boolean;
+    load_on_startup?: boolean;
+    external_signer?: boolean;
+  }) {
+    return await this.request<CreateWallet>("createwallet", options);
   }
 
   /*
@@ -1749,14 +2037,14 @@ export default class BitcoinRPC {
   1. address    (string, required) The bitcoin address for the private key
   */
   public async dumpprivkey(options: { address: string }) {
-    return await this.request<DumpPrivkey>('dumpprivkey', options);
+    return await this.request<DumpPrivkey>("dumpprivkey", options);
   }
 
   /*
   encryptwallet "passphrase"
 
   Encrypts the wallet with 'passphrase'. This is for first time encryption.
-  After this, any calls that interact with private keys such as sending or signing 
+  After this, any calls that interact with private keys such as sending or signing
   will require the passphrase to be set prior the making these calls.
   Use the walletpassphrase call for this, and then walletlock call.
   If the wallet is already encrypted, use the walletpassphrasechange call.
@@ -1765,7 +2053,7 @@ export default class BitcoinRPC {
   1. passphrase    (string, required) The pass phrase to encrypt the wallet with. It must be at least 1 character, but should be long.
   */
   public async encryptwallet(options: { passphrase: string }) {
-    return await this.request<EncryptWallet>('encryptwallet', options);
+    return await this.request<EncryptWallet>("encryptwallet", options);
   }
 
   /*
@@ -1777,7 +2065,10 @@ export default class BitcoinRPC {
   1. label    (string, required) The label.
   */
   public async getaddressesbylabel(options: { label: string }) {
-    return await this.request<GetAddressesByLabel>('getaddressesbylabel', options);
+    return await this.request<GetAddressesByLabel>(
+      "getaddressesbylabel",
+      options,
+    );
   }
 
   /*
@@ -1790,7 +2081,7 @@ export default class BitcoinRPC {
   1. address    (string, required) The bitcoin address for which to get information.
   */
   public async getaddressinfo(options: { address: string }) {
-    return await this.request<GetAddressInfo>('getaddressinfo', options);
+    return await this.request<GetAddressInfo>("getaddressinfo", options);
   }
 
   /*
@@ -1806,8 +2097,15 @@ export default class BitcoinRPC {
   3. include_watchonly    (boolean, optional, default=true for watch-only wallets, otherwise false) Also include balance in watch-only addresses (see 'importaddress')
   4. avoid_reuse          (boolean, optional, default=true) (only available if avoid_reuse wallet flag is set) Do not include balance in dirty outputs; addresses are considered dirty if they have previously been used in a transaction.
   */
-  public async getbalance(options: { dummy?: string, minconf?: number, include_watchonly?: boolean, avoid_reuse?: boolean } = {}) {
-    return await this.request<GetBalance>('getbalance', options);
+  public async getbalance(
+    options: {
+      dummy?: string;
+      minconf?: number;
+      include_watchonly?: boolean;
+      avoid_reuse?: boolean;
+    } = {},
+  ) {
+    return await this.request<GetBalance>("getbalance", options);
   }
 
   /*
@@ -1816,22 +2114,24 @@ export default class BitcoinRPC {
   Returns an object with all balances in BTC.
   */
   public async getbalances() {
-    return await this.request<GetBalances>('getbalances');
+    return await this.request<GetBalances>("getbalances");
   }
 
   /*
   getnewaddress ( "label" "address_type" )
 
   Returns a new Bitcoin address for receiving payments.
-  If 'label' is specified, it is added to the address book 
+  If 'label' is specified, it is added to the address book
   so payments received with the address will be associated with 'label'.
 
   Arguments:
   1. label           (string, optional, default="") The label name for the address to be linked to. It can also be set to the empty string "" to represent the default label. The label does not need to exist, it will be created if there is no label by the given name.
   2. address_type    (string, optional, default=set by -addresstype) The address type to use. Options are "legacy", "p2sh-segwit", "bech32", and "bech32m".
   */
-  public async getnewaddress(options: { label?: string, address_type?: string } = {}) {
-    return await this.request<GetNewAddress>('getnewaddress', options);
+  public async getnewaddress(
+    options: { label?: string; address_type?: string } = {},
+  ) {
+    return await this.request<GetNewAddress>("getnewaddress", options);
   }
 
   /*
@@ -1843,8 +2143,15 @@ export default class BitcoinRPC {
   Arguments:
   1. address_type    (string, optional, default=set by -changetype) The address type to use. Options are "legacy", "p2sh-segwit", "bech32", and "bech32m".
   */
-  public async getrawchangeaddress(options: { address_type?: 'legacy' | 'p2sh-segwit' | 'bech32' | 'bech32m' } = {}) {
-    return await this.request<GetRawChangeAddress>('getrawchangeaddress', options);
+  public async getrawchangeaddress(
+    options: {
+      address_type?: "legacy" | "p2sh-segwit" | "bech32" | "bech32m";
+    } = {},
+  ) {
+    return await this.request<GetRawChangeAddress>(
+      "getrawchangeaddress",
+      options,
+    );
   }
 
   /*
@@ -1857,8 +2164,15 @@ export default class BitcoinRPC {
   2. minconf                      (numeric, optional, default=1) Only include transactions confirmed at least this many times.
   3. include_immature_coinbase    (boolean, optional, default=false) Include immature coinbase transactions.
   */
-  public async getreceivedbyaddress(options: { address: string, minconf?: number, include_immature_coinbase?: boolean }) {
-    return await this.request<GetReceivedByAddress>('getreceivedbyaddress', options);
+  public async getreceivedbyaddress(options: {
+    address: string;
+    minconf?: number;
+    include_immature_coinbase?: boolean;
+  }) {
+    return await this.request<GetReceivedByAddress>(
+      "getreceivedbyaddress",
+      options,
+    );
   }
 
   /*
@@ -1871,8 +2185,15 @@ export default class BitcoinRPC {
   2. minconf                      (numeric, optional, default=1) Only include transactions confirmed at least this many times.
   3. include_immature_coinbase    (boolean, optional, default=false) Include immature coinbase transactions.
   */
-  public async getreceivedbylabel(options: { label: string, minconf?: number, include_immature_coinbase?: boolean }) {
-    return await this.request<GetReceivedByLabel>('getreceivedbylabel', options);
+  public async getreceivedbylabel(options: {
+    label: string;
+    minconf?: number;
+    include_immature_coinbase?: boolean;
+  }) {
+    return await this.request<GetReceivedByLabel>(
+      "getreceivedbylabel",
+      options,
+    );
   }
 
   /*
@@ -1885,10 +2206,25 @@ export default class BitcoinRPC {
   2. include_watchonly    (boolean, optional, default=true for watch-only wallets, otherwise false) Whether to include watch-only addresses in balance calculation and details[]
   3. verbose              (boolean, optional, default=false) Whether to include a `decoded` field containing the decoded transaction (equivalent to RPC decoderawtransaction)
   */
-  public async gettransaction(options: { txid: string, include_watchonly?: boolean, verbose?: false }): Promise<RPCResponse<GetTransaction>>;
-  public async gettransaction(options: { txid: string, include_watchonly?: boolean, verbose: true }): Promise<RPCResponse<GetTransctionWithDecoded>>;
-  public async gettransaction(options: { txid: string, include_watchonly?: boolean, verbose?: boolean }) {
-    return await this.request<GetTransaction | GetTransctionWithDecoded>('gettransaction', options);
+  public async gettransaction(options: {
+    txid: string;
+    include_watchonly?: boolean;
+    verbose?: false;
+  }): Promise<RPCResponse<GetTransaction>>;
+  public async gettransaction(options: {
+    txid: string;
+    include_watchonly?: boolean;
+    verbose: true;
+  }): Promise<RPCResponse<GetTransctionWithDecoded>>;
+  public async gettransaction(options: {
+    txid: string;
+    include_watchonly?: boolean;
+    verbose?: boolean;
+  }) {
+    return await this.request<GetTransaction | GetTransctionWithDecoded>(
+      "gettransaction",
+      options,
+    );
   }
 
   /*
@@ -1898,7 +2234,7 @@ export default class BitcoinRPC {
   Identical to getbalances().mine.untrusted_pending
   */
   public async getunconfirmedbalance() {
-    return await this.request<GetUnconfirmedBalance>('getunconfirmedbalance');
+    return await this.request<GetUnconfirmedBalance>("getunconfirmedbalance");
   }
 
   /*
@@ -1907,7 +2243,7 @@ export default class BitcoinRPC {
   Returns an object containing various wallet state info.
   */
   public async getwalletinfo() {
-    return await this.request<GetWalletInfo>('getwalletinfo');
+    return await this.request<GetWalletInfo>("getwalletinfo");
   }
 
   /*
@@ -1933,8 +2269,13 @@ export default class BitcoinRPC {
   3. rescan     (boolean, optional, default=true) Scan the chain and mempool for wallet transactions.
   4. p2sh       (boolean, optional, default=false) Add the P2SH version of the script as well
   */
-  public async importaddress(options: { address: string, label?: string, rescan?: boolean, p2sh?: boolean }) {
-    return await this.request<ImportAddress>('importaddress', options);
+  public async importaddress(options: {
+    address: string;
+    label?: string;
+    rescan?: boolean;
+    p2sh?: boolean;
+  }) {
+    return await this.request<ImportAddress>("importaddress", options);
   }
 
   /*
@@ -1970,12 +2311,12 @@ export default class BitcoinRPC {
       active?: boolean;
       range: number | [number, number];
       next_index: number;
-      timestamp: number | 'now';
+      timestamp: number | "now";
       internal?: boolean;
       label?: string;
-    }>
+    }>;
   }) {
-    return await this.request<ImportDescriptors>('importdescriptors', options);
+    return await this.request<ImportDescriptors>("importdescriptors", options);
   }
 
   /*
@@ -2031,7 +2372,7 @@ export default class BitcoinRPC {
     requests: Array<{
       desc: string;
       scriptPubKey: string | { address: string };
-      timestamp: number | 'now';
+      timestamp: number | "now";
       redeemscript: string;
       witnessscript: string;
       pubkeys: string[];
@@ -2041,12 +2382,12 @@ export default class BitcoinRPC {
       watchonly?: boolean;
       label?: string;
       keypool?: boolean;
-    }>,
+    }>;
     options?: {
       rescan?: boolean;
-    }
+    };
   }) {
-    return await this.request<ImportMulti>('importmulti', options);
+    return await this.request<ImportMulti>("importmulti", options);
   }
 
   /*
@@ -2066,8 +2407,12 @@ export default class BitcoinRPC {
   2. label      (string, optional, default=current label if address exists, otherwise "") An optional label
   3. rescan     (boolean, optional, default=true) Scan the chain and mempool for wallet transactions.
   */
-  public async importprivkey(options: { privkey: string, label?: string, rescan?: boolean }) {
-    return await this.request<ImportPrivkey>('importprivkey', options);
+  public async importprivkey(options: {
+    privkey: string;
+    label?: string;
+    rescan?: boolean;
+  }) {
+    return await this.request<ImportPrivkey>("importprivkey", options);
   }
 
   /*
@@ -2079,8 +2424,11 @@ export default class BitcoinRPC {
   1. rawtransaction    (string, required) A raw transaction in hex funding an already-existing address in wallet
   2. txoutproof        (string, required) The hex output from gettxoutproof that contains the transaction
   */
-  public async importprunedfunds(options: { rawtransaction: string, txoutproof: string }) {
-    return await this.request<ImportPrunedFunds>('importprunedfunds', options);
+  public async importprunedfunds(options: {
+    rawtransaction: string;
+    txoutproof: string;
+  }) {
+    return await this.request<ImportPrunedFunds>("importprunedfunds", options);
   }
 
   /*
@@ -2100,8 +2448,12 @@ export default class BitcoinRPC {
   2. label     (string, optional, default="") An optional label
   3. rescan    (boolean, optional, default=true) Scan the chain and mempool for wallet transactions.
   */
-  public async importpubkey(options: { pubkey: string, label?: string, rescan?: boolean }) {
-    return await this.request<ImportPubkey>('importpubkey', options);
+  public async importpubkey(options: {
+    pubkey: string;
+    label?: string;
+    rescan?: boolean;
+  }) {
+    return await this.request<ImportPubkey>("importpubkey", options);
   }
 
   /*
@@ -2114,7 +2466,7 @@ export default class BitcoinRPC {
   1. filename    (string, required) The wallet file
   */
   public async importwallet(options: { filename: string }) {
-    return await this.request<ImportWallet>('importwallet', options);
+    return await this.request<ImportWallet>("importwallet", options);
   }
 
   /*
@@ -2127,7 +2479,7 @@ export default class BitcoinRPC {
   1. newsize    (numeric, optional, default=1000, or as set by -keypool) The new keypool size
   */
   public async keypoolrefill(options: { newsize?: number } = {}) {
-    return await this.request<KeypoolRefill>('keypoolrefill', options);
+    return await this.request<KeypoolRefill>("keypoolrefill", options);
   }
 
   /*
@@ -2138,7 +2490,7 @@ export default class BitcoinRPC {
   in past transactions
   */
   public async listaddressgroupings() {
-    return await this.request<ListAddressGroupings>('listaddressgroupings');
+    return await this.request<ListAddressGroupings>("listaddressgroupings");
   }
 
   /*
@@ -2150,7 +2502,7 @@ export default class BitcoinRPC {
   1. private    (boolean, optional, default=false) Show private descriptors.
   */
   public async listdescriptors(options: { private?: boolean } = {}) {
-    return await this.request<ListDescriptors>('listdescriptors', options);
+    return await this.request<ListDescriptors>("listdescriptors", options);
   }
 
   /*
@@ -2162,7 +2514,7 @@ export default class BitcoinRPC {
   1. purpose    (string, optional) Address purpose to list labels for ('send','receive'). An empty string is the same as not providing this argument.
   */
   public async listlabels(options: { purpose?: string } = {}) {
-    return await this.request<ListLabels>('listlabels', options);
+    return await this.request<ListLabels>("listlabels", options);
   }
 
   /*
@@ -2172,7 +2524,7 @@ export default class BitcoinRPC {
   See the lockunspent call to lock and unlock transactions for spending.
   */
   public async listlockunspent() {
-    return await this.request<ListLockUnspent>('listlockunspent');
+    return await this.request<ListLockUnspent>("listlockunspent");
   }
 
   /*
@@ -2187,8 +2539,19 @@ export default class BitcoinRPC {
   4. address_filter               (string, optional) If present and non-empty, only return information on this address.
   5. include_immature_coinbase    (boolean, optional, default=false) Include immature coinbase transactions.
   */
-  public async listreceivedbyaddress(options: { minconf?: number, include_empty?: boolean, include_watchonly?: boolean, address_filter?: string, include_immature_coinbase?: boolean } = {}) {
-    return await this.request<ListReceivedByAddress>('listreceivedbyaddress', options);
+  public async listreceivedbyaddress(
+    options: {
+      minconf?: number;
+      include_empty?: boolean;
+      include_watchonly?: boolean;
+      address_filter?: string;
+      include_immature_coinbase?: boolean;
+    } = {},
+  ) {
+    return await this.request<ListReceivedByAddress>(
+      "listreceivedbyaddress",
+      options,
+    );
   }
 
   /*
@@ -2202,8 +2565,18 @@ export default class BitcoinRPC {
   3. include_watchonly            (boolean, optional, default=true for watch-only wallets, otherwise false) Whether to include watch-only addresses (see 'importaddress')
   4. include_immature_coinbase    (boolean, optional, default=false) Include immature coinbase transactions.
   */
-  public async listreceivedbylabel(options: { minconf?: number, include_empty?: boolean, include_watchonly?: boolean, include_immature_coinbase?: boolean } = {}) {
-    return await this.request<ListReceivedByLabel>('listreceivedbylabel', options);
+  public async listreceivedbylabel(
+    options: {
+      minconf?: number;
+      include_empty?: boolean;
+      include_watchonly?: boolean;
+      include_immature_coinbase?: boolean;
+    } = {},
+  ) {
+    return await this.request<ListReceivedByLabel>(
+      "listreceivedbylabel",
+      options,
+    );
   }
 
   /*
@@ -2221,8 +2594,16 @@ export default class BitcoinRPC {
                             (not guaranteed to work on pruned nodes)
   5. include_change          (boolean, optional, default=false) Also add entries for change outputs.
   */
-  public async listsinceblock(options: { blockhash?: string, target_confirmations?: number, include_watchonly?: boolean, include_removed?: boolean, include_change?: boolean } = {}) {
-    return await this.request<ListSinceBlock>('listsinceblock', options);
+  public async listsinceblock(
+    options: {
+      blockhash?: string;
+      target_confirmations?: number;
+      include_watchonly?: boolean;
+      include_removed?: boolean;
+      include_change?: boolean;
+    } = {},
+  ) {
+    return await this.request<ListSinceBlock>("listsinceblock", options);
   }
 
   /*
@@ -2239,8 +2620,15 @@ export default class BitcoinRPC {
   3. skip                 (numeric, optional, default=0) The number of transactions to skip
   4. include_watchonly    (boolean, optional, default=true for watch-only wallets, otherwise false) Include transactions to watch-only addresses (see 'importaddress')
   */
-  public async listtransactions(options: { label?: string, count?: number, skip?: number, include_watchonly?: boolean } = {}) {
-    return await this.request<ListTransactions>('listtransactions', options);
+  public async listtransactions(
+    options: {
+      label?: string;
+      count?: number;
+      skip?: number;
+      include_watchonly?: boolean;
+    } = {},
+  ) {
+    return await this.request<ListTransactions>("listtransactions", options);
   }
 
   /*
@@ -2269,18 +2657,18 @@ export default class BitcoinRPC {
       }
   */
   public async listunspent(options: {
-    minconf?: number,
-    maxconf?: number,
-    addresses?: string[],
-    include_unsafe?: boolean,
+    minconf?: number;
+    maxconf?: number;
+    addresses?: string[];
+    include_unsafe?: boolean;
     query_options?: {
-      minimumAmount?: number | string,
-      maximumAmount?: number | string,
-      maximumCount?: number,
-      minimumSumAmount?: number | string,
-    }
+      minimumAmount?: number | string;
+      maximumAmount?: number | string;
+      maximumCount?: number;
+      minimumSumAmount?: number | string;
+    };
   }) {
-    return await this.request<ListUnspent>('listunspent', options);
+    return await this.request<ListUnspent>("listunspent", options);
   }
 
   /*
@@ -2289,7 +2677,7 @@ export default class BitcoinRPC {
   Returns a list of wallets in the wallet directory.
   */
   public async listwalletdir() {
-    return await this.request<ListWalletDir>('listwalletdir');
+    return await this.request<ListWalletDir>("listwalletdir");
   }
 
   /*
@@ -2299,7 +2687,7 @@ export default class BitcoinRPC {
   For full information on the wallet, use "getwalletinfo"
   */
   public async listwallets() {
-    return await this.request<ListWallets>('listwallets');
+    return await this.request<ListWallets>("listwallets");
   }
 
   /*
@@ -2313,8 +2701,11 @@ export default class BitcoinRPC {
   1. filename           (string, required) The wallet directory or .dat file.
   2. load_on_startup    (boolean, optional) Save wallet name to persistent settings and load on startup. True to add wallet to startup list, false to remove, null to leave unchanged.
   */
-  public async loadwallet(options: { filename: string, load_on_startup?: boolean }) {
-    return await this.request<LoadWallet>('loadwallet', options);
+  public async loadwallet(options: {
+    filename: string;
+    load_on_startup?: boolean;
+  }) {
+    return await this.request<LoadWallet>("loadwallet", options);
   }
 
   /*
@@ -2342,8 +2733,12 @@ export default class BitcoinRPC {
       ]
   3. persistent              (boolean, optional, default=false) Whether to write/erase this lock in the wallet database, or keep the change in memory only. Ignored for unlocking.
   */
-  public async lockunspent(options: { unlock: boolean, transactions?: Array<{ txid: string, vout: number }>, persistent?: boolean }) {
-    return await this.request<LockUnspent>('lockunspent', options);
+  public async lockunspent(options: {
+    unlock: boolean;
+    transactions?: Array<{ txid: string; vout: number }>;
+    persistent?: boolean;
+  }) {
+    return await this.request<LockUnspent>("lockunspent", options);
   }
 
   /*
@@ -2360,7 +2755,7 @@ export default class BitcoinRPC {
   Requires wallet passphrase to be set with walletpassphrase call if wallet is encrypted.
   */
   public async migratewallet() {
-    return await this.request<MigrateWallet>('migratewallet');
+    return await this.request<MigrateWallet>("migratewallet");
   }
 
   /*
@@ -2375,7 +2770,7 @@ export default class BitcoinRPC {
   Requires wallet passphrase to be set with walletpassphrase call if wallet is encrypted.
   */
   public async newkeypool() {
-    return await this.request<NewKeypool>('newkeypool');
+    return await this.request<NewKeypool>("newkeypool");
   }
 
   /*
@@ -2400,12 +2795,12 @@ export default class BitcoinRPC {
   2. options                        (json object, optional)
       {
         "conf_target": n,          (numeric, optional, default=wallet -txconfirmtarget) Confirmation target in blocks
-                                    
-        "fee_rate": amount,        (numeric or string, optional, default=not set, fall back to wallet fee estimation) 
+
+        "fee_rate": amount,        (numeric or string, optional, default=not set, fall back to wallet fee estimation)
                                     Specify a fee rate in sat/vB instead of relying on the built-in fee estimator.
                                     Must be at least 1.000 sat/vB higher than the current transaction fee rate.
                                     WARNING: before version 0.21, fee_rate was in BTC/kvB. As of 0.21, fee_rate is in sat/vB.
-                                    
+
         "replaceable": bool,       (boolean, optional, default=true) Whether the new transaction should still be
                                     marked bip-125 replaceable. If true, the sequence numbers in the transaction will
                                     be left unchanged from the original. If false, any input sequence numbers in the
@@ -2413,7 +2808,7 @@ export default class BitcoinRPC {
                                     so the new transaction will not be explicitly bip-125 replaceable (though it may
                                     still be replaceable in practice, for example if it has unconfirmed ancestors which
                                     are replaceable).
-                                    
+
         "estimate_mode": "str",    (string, optional, default="unset") The fee estimate mode, must be one of (case insensitive):
                                     "unset"
                                     "economical"
@@ -2421,15 +2816,15 @@ export default class BitcoinRPC {
       }
   */
   public async psbtbumpfee(options: {
-    txid: string,
+    txid: string;
     options?: {
-      conf_target?: number,
-      fee_rate?: number,
-      replaceable?: boolean,
-      estimate_mode?: 'unset' | 'economic' | 'conservative'
-    }
+      conf_target?: number;
+      fee_rate?: number;
+      replaceable?: boolean;
+      estimate_mode?: "unset" | "economic" | "conservative";
+    };
   }) {
-    return await this.request<PsbtBumpFee>('psbtbumpfee', options);
+    return await this.request<PsbtBumpFee>("psbtbumpfee", options);
   }
 
   /*
@@ -2441,7 +2836,7 @@ export default class BitcoinRPC {
   1. txid    (string, required) The hex-encoded id of the transaction you are deleting
   */
   public async removeprunedfunds(options: { txid: string }) {
-    return await this.request<RemovePrunedFunds>('removeprunedfunds', options);
+    return await this.request<RemovePrunedFunds>("removeprunedfunds", options);
   }
 
   /*
@@ -2454,8 +2849,10 @@ export default class BitcoinRPC {
   1. start_height    (numeric, optional, default=0) block height where the rescan should start
   2. stop_height     (numeric, optional) the last block height that should be scanned. If none is provided it will rescan up to the tip at return time of this call.
   */
-  public async rescanblockchain(options: { start_height?: number, stop_height?: number } = {}) {
-    return await this.request<RescanBlockchain>('rescanblockchain', options);
+  public async rescanblockchain(
+    options: { start_height?: number; stop_height?: number } = {},
+  ) {
+    return await this.request<RescanBlockchain>("rescanblockchain", options);
   }
 
   /*
@@ -2468,8 +2865,12 @@ export default class BitcoinRPC {
   2. backup_file        (string, required) The backup file that will be used to restore the wallet.
   3. load_on_startup    (boolean, optional) Save wallet name to persistent settings and load on startup. True to add wallet to startup list, false to remove, null to leave unchanged.
   */
-  public async restorewallet(options: { wallet_name: string, backup_file: string, load_on_startup?: boolean }) {
-    return await this.request<RestoreWallet>('restorewallet', options);
+  public async restorewallet(options: {
+    wallet_name: string;
+    backup_file: string;
+    load_on_startup?: boolean;
+  }) {
+    return await this.request<RestoreWallet>("restorewallet", options);
   }
 
   /*
@@ -2502,7 +2903,7 @@ export default class BitcoinRPC {
   5. options                               (json object, optional)
       {
         "add_inputs": bool,               (boolean, optional, default=false when "inputs" are specified, true otherwise) Automatically include coins from the wallet to cover the target amount.
-                                          
+
         "include_unsafe": bool,           (boolean, optional, default=false) Include inputs that are not safe to spend (unconfirmed transactions from outside keys and unconfirmed replacement transactions).
                                           Warning: the resulting transaction may become invalid if one of the unsafe inputs disappears.
                                           If that happens, you will need to fund the transaction with different inputs and republish it.
@@ -2556,15 +2957,18 @@ export default class BitcoinRPC {
       }
   */
   public async send(options: {
-    outputs: Array<{
-      [key: string]: string | number;
-    } | { data: string }>,
-    conf_target?: number,
-    estimate_mode?: 'unset' | 'economical' | 'conservative',
-    fee_rate?: number | string,
-    options?: SendOptionsInput
+    outputs: Array<
+      | {
+          [key: string]: string | number;
+        }
+      | { data: string }
+    >;
+    conf_target?: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+    fee_rate?: number | string;
+    options?: SendOptionsInput;
   }) {
-    return await this.request<Send>('send', options);
+    return await this.request<Send>("send", options);
   }
 
   /*
@@ -2579,7 +2983,7 @@ export default class BitcoinRPC {
   Arguments:
   1. recipients                       (json array, required) The sendall destinations. Each address may only appear once.
                                       Optionally some recipients can be specified with an amount to perform payments, but at least one address must appear without a specified amount.
-                                      
+
       [
         "address",                   (string, required) A bitcoin address which receives an equal share of the unspecified amount.
         {                            (json object)
@@ -2638,13 +3042,13 @@ export default class BitcoinRPC {
       }
   */
   public async sendall(options: {
-    recipients: Array<string | { [key: string]: string | number }>,
-    conf_target?: number,
-    estimate_mode?: 'unset' | 'economical' | 'conservative',
-    fee_rate?: number | string,
-    options?: SendAllOptionsInput
+    recipients: Array<string | { [key: string]: string | number }>;
+    conf_target?: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+    fee_rate?: number | string;
+    options?: SendAllOptionsInput;
   }) {
-    return await this.request<SendAll>('sendall', options);
+    return await this.request<SendAll>("sendall", options);
   }
 
   /*
@@ -2680,43 +3084,43 @@ export default class BitcoinRPC {
   10. verbose                  (boolean, optional, default=false) If true, return extra infomration about the transaction.
   */
   public async sendmany(options: {
-    dummy: '',
-    amounts:  { [key: string]: number | string },
-    minconf?: number,
-    comment?: string,
-    subtractfeefrom?: string[],
-    replaceable?: boolean,
-    conf_target?: number,
-    estimate_mode?: 'unset' | 'economical' | 'conservative',
-    fee_rate?: number | string,
-    verbose?: false
+    dummy: "";
+    amounts: { [key: string]: number | string };
+    minconf?: number;
+    comment?: string;
+    subtractfeefrom?: string[];
+    replaceable?: boolean;
+    conf_target?: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+    fee_rate?: number | string;
+    verbose?: false;
   }): Promise<RPCResponse<SendMany>>;
   public async sendmany(options: {
-    dummy: '',
-    amounts:  { [key: string]: number | string },
-    minconf?: number,
-    comment?: string,
-    subtractfeefrom?: string[],
-    replaceable?: boolean,
-    conf_target?: number,
-    estimate_mode?: 'unset' | 'economical' | 'conservative',
-    fee_rate?: number | string,
+    dummy: "";
+    amounts: { [key: string]: number | string };
+    minconf?: number;
+    comment?: string;
+    subtractfeefrom?: string[];
+    replaceable?: boolean;
+    conf_target?: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+    fee_rate?: number | string;
     // @todo verbose should not be optional here, but is because of typing cosntraint - switch after move to named parameters
-    verbose: true
+    verbose: true;
   }): Promise<RPCResponse<SendManyVerbose>>;
   public async sendmany(options: {
-    dummy: '',
-    amounts:  { [key: string]: number | string },
-    minconf?: number,
-    comment?: string,
-    subtractfeefrom?: string[],
-    replaceable?: boolean,
-    conf_target?: number,
-    estimate_mode?: 'unset' | 'economical' | 'conservative',
-    fee_rate?: number | string,
-    verbose?: boolean
+    dummy: "";
+    amounts: { [key: string]: number | string };
+    minconf?: number;
+    comment?: string;
+    subtractfeefrom?: string[];
+    replaceable?: boolean;
+    conf_target?: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+    fee_rate?: number | string;
+    verbose?: boolean;
   }) {
-    return await this.request<SendMany | SendManyVerbose>('sendmany', options);
+    return await this.request<SendMany | SendManyVerbose>("sendmany", options);
   }
 
   /*
@@ -2731,7 +3135,7 @@ export default class BitcoinRPC {
   3. comment                  (string, optional) A comment used to store what the transaction is for.
                               This is not part of the transaction, just kept in your wallet.
   4. comment_to               (string, optional) A comment to store the name of the person or organization
-                              to which you're sending the transaction. This is not part of the 
+                              to which you're sending the transaction. This is not part of the
                               transaction, just kept in your wallet.
   5. subtractfeefromamount    (boolean, optional, default=false) The fee will be deducted from the amount being sent.
                               The recipient will receive less bitcoins than you enter in the amount field.
@@ -2747,45 +3151,48 @@ export default class BitcoinRPC {
   11. verbose                 (boolean, optional, default=false) If true, return extra information about the transaction.
   */
   public async sendtoaddress(options: {
-    address: string,
-    amount: number | string,
-    comment?: string,
-    comment_to?: string,
-    subtractfeefromamount?: boolean,
-    replaceable?: boolean,
-    conf_target?: number,
-    estimate_mode?: 'unset' | 'economical' | 'conservative',
-    avoid_reuse?: boolean,
-    fee_rate?: number | string,
-    verbose?: false
+    address: string;
+    amount: number | string;
+    comment?: string;
+    comment_to?: string;
+    subtractfeefromamount?: boolean;
+    replaceable?: boolean;
+    conf_target?: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+    avoid_reuse?: boolean;
+    fee_rate?: number | string;
+    verbose?: false;
   }): Promise<RPCResponse<SendToAddress>>;
   public async sendtoaddress(options: {
-    address: string,
-    amount: number | string,
-    comment?: string,
-    comment_to?: string,
-    subtractfeefromamount?: boolean,
-    replaceable?: boolean,
-    conf_target?: number,
-    estimate_mode?: 'unset' | 'economical' | 'conservative',
-    avoid_reuse?: boolean,
-    fee_rate?: number | string,
-    verbose: true
+    address: string;
+    amount: number | string;
+    comment?: string;
+    comment_to?: string;
+    subtractfeefromamount?: boolean;
+    replaceable?: boolean;
+    conf_target?: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+    avoid_reuse?: boolean;
+    fee_rate?: number | string;
+    verbose: true;
   }): Promise<RPCResponse<SendToAddressVerbose>>;
   public async sendtoaddress(options: {
-    address: string,
-    amount: number | string,
-    comment?: string,
-    comment_to?: string,
-    subtractfeefromamount?: boolean,
-    replaceable?: boolean,
-    conf_target?: number,
-    estimate_mode?: 'unset' | 'economical' | 'conservative',
-    avoid_reuse?: boolean,
-    fee_rate?: number | string,
-    verbose?: boolean
+    address: string;
+    amount: number | string;
+    comment?: string;
+    comment_to?: string;
+    subtractfeefromamount?: boolean;
+    replaceable?: boolean;
+    conf_target?: number;
+    estimate_mode?: "unset" | "economical" | "conservative";
+    avoid_reuse?: boolean;
+    fee_rate?: number | string;
+    verbose?: boolean;
   }) {
-    return await this.request<SendToAddress | SendToAddressVerbose>('sendtoaddress', options);
+    return await this.request<SendToAddress | SendToAddressVerbose>(
+      "sendtoaddress",
+      options,
+    );
   }
 
   /*
@@ -2805,8 +3212,10 @@ export default class BitcoinRPC {
   2. seed          (string, optional, default=random seed) The WIF private key to use as the new HD seed.
                   The seed value can be retrieved using the dumpwallet command. It is the private key marked hdseed=1
   */
-  public async sethdseed(options: { newkeypool?: boolean, seed?: string } = {}) {
-    return await this.request<SetHdSeed>('sethdseed', options);
+  public async sethdseed(
+    options: { newkeypool?: boolean; seed?: string } = {},
+  ) {
+    return await this.request<SetHdSeed>("sethdseed", options);
   }
 
   /*
@@ -2818,8 +3227,8 @@ export default class BitcoinRPC {
   1. address    (string, required) The bitcoin address to be associated with a label.
   2. label      (string, required) The label to assign to the address.
   */
-  public async setlabel(options: { address: string, label: string }) {
-    return await this.request<SetLabel>('setlabel', options);
+  public async setlabel(options: { address: string; label: string }) {
+    return await this.request<SetLabel>("setlabel", options);
   }
 
   /*
@@ -2832,7 +3241,7 @@ export default class BitcoinRPC {
   1. amount    (numeric or string, required) The transaction fee rate in BTC/kvB
   */
   public async settxfee(options: { amount: number | string }) {
-    return await this.request<SetTxFee>('settxfee', options);
+    return await this.request<SetTxFee>("settxfee", options);
   }
 
   /*
@@ -2844,8 +3253,11 @@ export default class BitcoinRPC {
   1. flag     (string, required) The name of the flag to change. Current available flags: avoid_reuse
   2. value    (boolean, optional, default=true) The new state.
   */
-  public async setwalletflag(options: { flag: 'avoid_reuse', value?: boolean }) {
-    return await this.request<SetWalletFlag>('setwalletflag', options);
+  public async setwalletflag(options: {
+    flag: "avoid_reuse";
+    value?: boolean;
+  }) {
+    return await this.request<SetWalletFlag>("setwalletflag", options);
   }
 
   /*
@@ -2858,8 +3270,8 @@ export default class BitcoinRPC {
   1. address    (string, required) The bitcoin address to use for the private key.
   2. message    (string, required) The message to create a signature of.
   */
-  public async signmessage(options: { address: string, message: string }) {
-    return await this.request<SignMessage>('signmessage', options);
+  public async signmessage(options: { address: string; message: string }) {
+    return await this.request<SignMessage>("signmessage", options);
   }
 
   /*
@@ -2894,18 +3306,28 @@ export default class BitcoinRPC {
                                       "SINGLE|ANYONECANPAY"
   */
   public async signrawtransactionwithwallet(options: {
-    hexstring: string,
+    hexstring: string;
     prevtxs?: Array<{
-      txid: string,
-      vout: number,
-      scriptPubKey: string,
-      redeemScript?: string,
-      witnessScript?: string,
-      amount?: number | string 
-    }>,
-    sighashtype?: 'DEFAULT' | 'ALL' | 'NONE' | 'SINGLE' | 'ALL|ANYONECANPAY' | 'NONE|ANYONECANPAY' | 'SINGLE|ANYONECANPAY'
+      txid: string;
+      vout: number;
+      scriptPubKey: string;
+      redeemScript?: string;
+      witnessScript?: string;
+      amount?: number | string;
+    }>;
+    sighashtype?:
+      | "DEFAULT"
+      | "ALL"
+      | "NONE"
+      | "SINGLE"
+      | "ALL|ANYONECANPAY"
+      | "NONE|ANYONECANPAY"
+      | "SINGLE|ANYONECANPAY";
   }) {
-    return await this.request<SignRawTransactionWithWallet>('signrawtransactionwithwallet', options);
+    return await this.request<SignRawTransactionWithWallet>(
+      "signrawtransactionwithwallet",
+      options,
+    );
   }
 
   /*
@@ -2915,7 +3337,7 @@ export default class BitcoinRPC {
 
   Arguments:
   1. rawtxs                            (json array, optional) An array of hex strings of raw transactions.
-                                      
+
       [
         "rawtx",                      (string)
         ...
@@ -2926,8 +3348,16 @@ export default class BitcoinRPC {
         ...
       }
   */
-  public async simulaterawtransaction(options: { rawtsx?: string[], options?: { include_watchonly?: boolean } } = {}) {
-    return await this.request<SimulateRawTransaction>('simulaterawtransaction', options);
+  public async simulaterawtransaction(
+    options: {
+      rawtsx?: string[];
+      options?: { include_watchonly?: boolean };
+    } = {},
+  ) {
+    return await this.request<SimulateRawTransaction>(
+      "simulaterawtransaction",
+      options,
+    );
   }
 
   /*
@@ -2940,8 +3370,10 @@ export default class BitcoinRPC {
   1. wallet_name        (string, optional, default=the wallet name from the RPC endpoint) The name of the wallet to unload. If provided both here and in the RPC endpoint, the two must be identical.
   2. load_on_startup    (boolean, optional) Save wallet name to persistent settings and load on startup. True to add wallet to startup list, false to remove, null to leave unchanged.
   */
-  public async unloadwallet(options: { wallet_name?: string, load_on_startup?: boolean } = {}) {
-    return await this.request<UnloadWallet>('unloadwallet', options);
+  public async unloadwallet(
+    options: { wallet_name?: string; load_on_startup?: boolean } = {},
+  ) {
+    return await this.request<UnloadWallet>("unloadwallet", options);
   }
 
   /*
@@ -2954,7 +3386,7 @@ export default class BitcoinRPC {
   1. version    (numeric, optional, default=169900) The version number to upgrade to. Default is the latest wallet version.
   */
   public async upgradewallet(options: { version?: number } = {}) {
-    return await this.request<UpgradeWallet>('upgradewallet', options);
+    return await this.request<UpgradeWallet>("upgradewallet", options);
   }
 
   /*
@@ -2994,7 +3426,7 @@ export default class BitcoinRPC {
   4. options                            (json object, optional)
       {
         "add_inputs": bool,            (boolean, optional, default=false when "inputs" are specified, true otherwise) Automatically include coins from the wallet to cover the target amount.
-                                        
+
         "include_unsafe": bool,        (boolean, optional, default=false) Include inputs that are not safe to spend (unconfirmed transactions from outside keys and unconfirmed replacement transactions).
                                         Warning: the resulting transaction may become invalid if one of the unsafe inputs disappears.
                                         If that happens, you will need to fund the transaction with different inputs and republish it.
@@ -3043,15 +3475,21 @@ export default class BitcoinRPC {
       vout: number;
       sequence?: number;
       weight?: number;
-    }>,
-    outputs: Array<{
-      [key: string]: string | number;
-    } | { data: string }>,
-    locktime?: number,
-    options?: WalletCreateFundedPsbtOptionsInput,
-    bip32derivs?: boolean
+    }>;
+    outputs: Array<
+      | {
+          [key: string]: string | number;
+        }
+      | { data: string }
+    >;
+    locktime?: number;
+    options?: WalletCreateFundedPsbtOptionsInput;
+    bip32derivs?: boolean;
   }) {
-    return await this.request<WalletCreateFundedPsbt>('walletcreatefundedpsbt', options);
+    return await this.request<WalletCreateFundedPsbt>(
+      "walletcreatefundedpsbt",
+      options,
+    );
   }
 
   /*
@@ -3060,7 +3498,10 @@ export default class BitcoinRPC {
   Display address on an external signer for verification.
   */
   public async walletdisplayaddress(options: { address: string }) {
-    return await this.request<WalletDisplayAddress>('walletdisplayaddress', options);
+    return await this.request<WalletDisplayAddress>(
+      "walletdisplayaddress",
+      options,
+    );
   }
 
   /*
@@ -3071,7 +3512,7 @@ export default class BitcoinRPC {
   before being able to call any methods which require the wallet to be unlocked.
   */
   public async walletlock() {
-    return await this.request<WalletLock>('walletlock');
+    return await this.request<WalletLock>("walletlock");
   }
 
   /*
@@ -3088,8 +3529,11 @@ export default class BitcoinRPC {
   1. passphrase    (string, required) The wallet passphrase
   2. timeout       (numeric, required) The time to keep the decryption key in seconds; capped at 100000000 (~3 years).
   */
-  public async walletpassphrase(options: { passphrase: string, timeout: number }) {
-    return await this.request<WalletPassphrase>('walletpassphrase', options);
+  public async walletpassphrase(options: {
+    passphrase: string;
+    timeout: number;
+  }) {
+    return await this.request<WalletPassphrase>("walletpassphrase", options);
   }
 
   /*
@@ -3101,8 +3545,14 @@ export default class BitcoinRPC {
   1. oldpassphrase    (string, required) The current passphrase
   2. newpassphrase    (string, required) The new passphrase
   */
-  public async walletpassphrasechange(options: { oldpassphrase: string, newpassphrase: string }) {
-    return await this.request<WalletPassphraseChange>('walletpassphrasechange', options);
+  public async walletpassphrasechange(options: {
+    oldpassphrase: string;
+    newpassphrase: string;
+  }) {
+    return await this.request<WalletPassphraseChange>(
+      "walletpassphrasechange",
+      options,
+    );
   }
 
   /*
@@ -3127,13 +3577,20 @@ export default class BitcoinRPC {
   5. finalize       (boolean, optional, default=true) Also finalize inputs if possible
   */
   public async walletprocesspsbt(options: {
-    psbt: string,
-    sign?: boolean,
-    sighashtype?: 'DEFAULT' | 'ALL' | 'NONE' | 'SINGLE' | 'ALL|ANYONECANPAY' | 'NONE|ANYONECANPAY' | 'SINGLE|ANYONECANPAY',
-    bip32derivs?: boolean,
-    finalize?: boolean
+    psbt: string;
+    sign?: boolean;
+    sighashtype?:
+      | "DEFAULT"
+      | "ALL"
+      | "NONE"
+      | "SINGLE"
+      | "ALL|ANYONECANPAY"
+      | "NONE|ANYONECANPAY"
+      | "SINGLE|ANYONECANPAY";
+    bip32derivs?: boolean;
+    finalize?: boolean;
   }) {
-    return await this.request<WalletProcessPsbt>('walletprocesspsbt', options);
+    return await this.request<WalletProcessPsbt>("walletprocesspsbt", options);
   }
 
   // ZMQ RPC
@@ -3144,6 +3601,6 @@ export default class BitcoinRPC {
   Returns information about the active ZeroMQ notifications.
   */
   public async getzmqnotifications() {
-    return await this.request<GetZmqNotifications>('getzmqnotifications');
+    return await this.request<GetZmqNotifications>("getzmqnotifications");
   }
 }

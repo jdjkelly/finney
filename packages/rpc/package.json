@@ -3,6 +3,10 @@
   "version": "0.0.3",
   "description": "A dependency-free TypeScript client for Bitcoin Core's JSON-RPC",
   "main": "./dist/index.js",
+  "scripts": {
+    "build": "bun build ./index.ts --outdir ./dist",
+    "dev": "bun build ./index.tsx --outdir ./dist --watch"
+  },
   "files": [
     "dist/package.json",
     "dist/*.js",
