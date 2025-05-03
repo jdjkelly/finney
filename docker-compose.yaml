@@ -1,0 +1,40 @@
+services:
+  scout:
+    build:
+      context: .
+      dockerfile: packages/scout/Dockerfile
+    container_name: finney-scout
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - BTCRPC_HOST=${BTCRPC_HOST:-bitcoin-node}
+    restart: unless-stopped
+    networks:
+      - finney-network
+
+# If you want to connect to a Bitcoin node, uncomment this section:
+#  bitcoin-node:
+#    image: ruimarinho/bitcoin-core:latest
+#    container_name: bitcoin-node
+#    command:
+#      - -regtest=1
+#      - -rpcallowip=0.0.0.0/0
+#      - -rpcbind=0.0.0.0
+#      - -rpcauth=bitcoin:7eef658e95a0db0ecf3cd6403eac1a4a$$ccbe950e448e13671a7529e40bc8828eba15a20106b8a5a5637fb792ecc231ef
+#    ports:
+#      - "18443:18443"
+#    volumes:
+#      - bitcoin-data:/home/bitcoin/.bitcoin
+#    restart: unless-stopped
+#    networks:
+#      - finney-network
+
+networks:
+  finney-network:
+    driver: bridge
+
+# If you want to connect to a Bitcoin node, uncomment this section:
+# volumes:
+#  bitcoin-data:
