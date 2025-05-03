@@ -9,7 +9,8 @@ COPY packages/rpc/package.json ./packages/rpc/
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN cd packages/scout && bun run build
+# Build all workspace packages in the correct order
+RUN bun run build
 
 FROM oven/bun:1.2.11-slim
 

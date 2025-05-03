@@ -5,6 +5,11 @@
   "workspaces": [
     "packages/*"
   ],
+  "scripts": {
+    "build": "bun run build:rpc && bun run build:scout",
+    "build:rpc": "bun run --cwd packages/rpc build",
+    "build:scout": "bun run --cwd packages/scout build"
+  },
   "dependencies": {},
   "devDependencies": {
     "@biomejs/biome": "1.6.4"
