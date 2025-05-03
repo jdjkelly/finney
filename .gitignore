@@ -38,5 +38,3 @@ dist/
 packages/pool/**
 packages/pool
 
-Dockerfile
-fly.toml
